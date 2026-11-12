@@ -1,0 +1,1010 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>民意信箱分案工作台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* 版面概念：公文收發的流程簽——上方一條六站的流程軌，下方是當站的公文夾（指標、閘門、清單），點案號展開「案件履歷」側欄 */
+:root{
+  --paper:#f4f6f9; --surface:#ffffff; --sunken:#eef1f6; --ink:#16202e; --muted:#5a6678; --faint:#8a95a6; --line:#dbe1ea;
+  --accent:#23486f; --accent-ink:#ffffff; --accent-soft:#e3ebf5;
+  --seal:#b3302a; --seal-soft:#f8e5e3; --warn:#9a6200; --warn-soft:#fbefd9; --ok:#2d7650; --ok-soft:#e2f2e8; --info:#3c5f8a;
+  --shadow:0 1px 2px rgba(22,32,46,.06),0 8px 24px rgba(22,32,46,.06);
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-disp:"Noto Serif TC","Songti TC","PMingLiU",serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0e131a; --surface:#151c26; --sunken:#111821; --ink:#e5eaf1; --muted:#9aa6b7; --faint:#6f7b8c; --line:#253041;
+  --accent:#8db2de; --accent-ink:#0e131a; --accent-soft:#1b2a3c;
+  --seal:#ea7468; --seal-soft:#3a1d1b; --warn:#e3a947; --warn-soft:#3a2b12; --ok:#62c48d; --ok-soft:#14301f; --info:#8db2de;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0e131a; --surface:#151c26; --sunken:#111821; --ink:#e5eaf1; --muted:#9aa6b7; --faint:#6f7b8c; --line:#253041;
+  --accent:#8db2de; --accent-ink:#0e131a; --accent-soft:#1b2a3c;
+  --seal:#ea7468; --seal-soft:#3a1d1b; --warn:#e3a947; --warn-soft:#3a2b12; --ok:#62c48d; --ok-soft:#14301f; --info:#8db2de;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--paper);color:var(--ink)}
+body{font-family:var(--f-body);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1440px;margin:0 auto}
+
+/* 頁首 */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar{display:flex;align-items:center;gap:16px;padding-block:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.seal-mark{width:38px;height:38px;border:2px solid var(--seal);color:var(--seal);border-radius:8px;display:grid;place-items:center;font-family:var(--f-disp);font-weight:900;font-size:15px;line-height:1;letter-spacing:.02em;transform:rotate(-4deg);flex:none}
+.brand h1{font-family:var(--f-disp);font-weight:900;font-size:20px;margin:0;letter-spacing:.04em;text-wrap:balance}
+.brand small{display:block;color:var(--muted);font-size:12px;letter-spacing:.02em}
+.top-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;white-space:nowrap;transition:background .15s,border-color .15s,transform .05s}
+.btn:hover{border-color:var(--accent);background:var(--accent-soft)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08);background:var(--accent)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn svg{width:16px;height:16px;flex:none}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:500;background:var(--sunken);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.chip.sim{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.chip.bad{background:var(--seal-soft);color:var(--seal);border-color:transparent}
+.chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.info{background:var(--accent-soft);color:var(--info);border-color:transparent}
+
+/* 流程軌 */
+.rail{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:10px;padding-block:16px 4px;overflow-x:auto;scrollbar-width:thin}
+.station{position:relative;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px 12px;cursor:pointer;display:grid;gap:6px;min-width:150px;transition:border-color .15s,box-shadow .15s}
+.station:hover{border-color:var(--accent)}
+.station[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent),var(--shadow)}
+.station .code{font-family:var(--f-mono);font-size:12px;color:var(--faint);letter-spacing:.06em;display:flex;justify-content:space-between;align-items:center}
+.station .name{font-weight:700;font-size:15px}
+.station .skill{font-family:var(--f-mono);font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.station .flow{display:flex;align-items:baseline;gap:6px;font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.station .flow b{font-size:20px;color:var(--ink);font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--line);flex:none}
+.station[data-state="done"] .dot{background:var(--ok)}
+.station[data-state="warn"] .dot{background:var(--warn)}
+.station[data-state="run"] .dot{background:var(--accent);animation:pulse 1s infinite}
+.station[data-state="block"] .dot{background:var(--seal)}
+@keyframes pulse{50%{opacity:.3}}
+.station .bar{height:3px;border-radius:3px;background:var(--sunken);overflow:hidden}
+.station .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .5s ease}
+.station[data-state="done"] .bar i,.station[data-state="warn"] .bar i{width:100%}
+.station[data-state="done"] .bar i{background:var(--ok)}
+.station[data-state="warn"] .bar i{background:var(--warn)}
+
+/* 主區 */
+main{padding-block:16px 48px}
+.layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.panel-h{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.panel-h h2,.panel-h h3{margin:0;font-size:15px;font-weight:700}
+.panel-b{padding:14px 16px;display:grid;gap:14px}
+.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 72px);display:grid;gap:16px}
+.field{display:grid;gap:6px}
+.field label,.lbl{font-size:12px;color:var(--muted);font-weight:500;letter-spacing:.04em}
+.field select,.field input[type=text],.field input[type=datetime-local],.field textarea{width:100%;border:1px solid var(--line);background:var(--sunken);border-radius:8px;padding:7px 10px;min-width:0}
+.field textarea{min-height:88px;font-family:var(--f-mono);font-size:12px;resize:vertical}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:16px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s;display:grid;gap:4px}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.drop strong{color:var(--ink)}
+.toggle{display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:4px 0}
+.toggle input{margin-top:3px;accent-color:var(--accent);width:16px;height:16px;flex:none}
+.toggle span{display:grid;line-height:1.45}
+.toggle small{color:var(--muted);font-size:12px}
+.seg{display:flex;background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px;flex-wrap:wrap}
+.seg button{flex:1;border:0;background:transparent;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:500}
+details.fold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:13px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:"＋";color:var(--faint)}
+details.fold[open]>summary::after{content:"－"}
+.map-grid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;align-items:center;font-size:13px}
+.map-grid select{border:1px solid var(--line);background:var(--sunken);border-radius:6px;padding:4px 6px;min-width:0;width:100%}
+
+/* 站內容 */
+.stage-head{display:flex;gap:16px;align-items:flex-start;padding:18px 20px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.stage-head .eyebrow{font-family:var(--f-mono);font-size:12px;color:var(--faint);letter-spacing:.08em}
+.stage-head h2{font-family:var(--f-disp);font-size:24px;font-weight:900;margin:2px 0 4px;letter-spacing:.03em;text-wrap:balance}
+.stage-head p{margin:0;color:var(--muted);max-width:68ch}
+.stage-head .io{margin-left:auto;display:grid;gap:4px;font-size:12px;color:var(--muted);min-width:220px;max-width:340px}
+.stage-head .io div{display:grid;grid-template-columns:3.2em 1fr;gap:6px}
+.stage-head .io b{color:var(--ink);font-weight:500}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.kpi{background:var(--surface);padding:12px 18px;display:grid;gap:2px}
+.kpi .v{font-family:var(--f-mono);font-size:26px;font-weight:600;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi .k{font-size:12px;color:var(--muted)}
+.kpi.bad .v{color:var(--seal)} .kpi.warn .v{color:var(--warn)} .kpi.ok .v{color:var(--ok)}
+.gates{padding:14px 20px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+.gate{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;font-size:13px}
+.gate .chip{margin-top:1px}
+.toolbar{display:flex;gap:10px;align-items:center;padding:12px 20px;flex-wrap:wrap}
+.search{flex:1;min-width:180px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--sunken);border-radius:8px;padding:6px 10px}
+.search input{border:0;background:transparent;outline:0;width:100%;min-width:0}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 12px;font-size:12px;cursor:pointer;color:var(--muted)}
+.filters button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.tablebox{overflow-x:auto;border-top:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{position:sticky;top:0;background:var(--sunken);text-align:left;font-weight:500;color:var(--muted);font-size:12px;letter-spacing:.03em;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr{cursor:pointer;transition:background .1s}
+tbody tr:hover{background:var(--accent-soft)}
+td .clip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:46ch}
+td.num{text-align:right;font-family:var(--f-mono)}
+.caseid{font-family:var(--f-mono);font-weight:500;white-space:nowrap}
+.urg{border-left:3px solid var(--seal)}
+.tok{font-family:var(--f-mono);font-size:.92em;background:var(--accent-soft);color:var(--info);border-radius:4px;padding:0 4px;white-space:nowrap}
+.ph{background:var(--warn-soft);color:var(--warn);border-radius:4px;padding:0 3px}
+.src{color:var(--faint);font-size:.88em}
+.more{padding:10px 20px;color:var(--muted);font-size:12px}
+.empty{padding:48px 20px;text-align:center;color:var(--muted);display:grid;gap:10px;justify-items:center}
+.empty h3{margin:0;color:var(--ink);font-family:var(--f-disp);font-size:20px}
+
+/* 印章 */
+.stamp{display:inline-grid;place-items:center;border:1.5px solid currentColor;border-radius:4px;padding:0 6px;font-family:var(--f-disp);font-weight:900;font-size:12px;letter-spacing:.08em;line-height:1.6;transform:rotate(-3deg);white-space:nowrap}
+.stamp.red{color:var(--seal)} .stamp.amber{color:var(--warn)} .stamp.blue{color:var(--info)} .stamp.green{color:var(--ok)}
+
+/* 案件履歷側欄 */
+.scrim{position:fixed;inset:0;background:rgba(10,15,22,.42);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+aside.drawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,100%);background:var(--surface);z-index:41;transform:translateX(100%);transition:transform .25s ease;display:flex;flex-direction:column;border-left:1px solid var(--line);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+aside.drawer.on{transform:none}
+.dr-h{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.dr-h h3{margin:0;font-family:var(--f-mono);font-size:18px}
+.dr-b{overflow-y:auto;padding:16px 20px 32px;display:grid;gap:4px}
+.step{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;position:relative;padding-bottom:18px}
+.step::before{content:"";position:absolute;left:21px;top:30px;bottom:0;width:1.5px;background:var(--line)}
+.step:last-child::before{display:none}
+.step .n{width:44px;height:28px;border-radius:6px;background:var(--accent-soft);color:var(--info);font-family:var(--f-mono);font-size:12px;font-weight:600;display:grid;place-items:center}
+.step h4{margin:3px 0 8px;font-size:14px}
+.box{background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px;white-space:pre-wrap;word-break:break-word}
+.kv{display:grid;grid-template-columns:7em minmax(0,1fr);gap:4px 10px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.cands{display:grid;gap:6px}
+.cand{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+.cand .r{font-family:var(--f-mono);font-weight:600;color:var(--accent)}
+.cand small{color:var(--muted);display:block}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.tabs button{border:0;background:none;padding:6px 10px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--accent);font-weight:500}
+.draft{position:relative}
+.draft .wm{position:absolute;right:10px;top:8px}
+.copy{margin-top:6px}
+
+/* 提示 */
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:8px;z-index:60;opacity:0;transition:opacity .2s,transform .2s;max-width:calc(100% - 32px);font-size:13px}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.note{font-size:12px;color:var(--muted);line-height:1.55}
+.privacy{display:flex;gap:10px;align-items:flex-start;background:var(--ok-soft);color:var(--ok);border-radius:8px;padding:10px 12px;font-size:12px}
+.privacy svg{width:16px;height:16px;flex:none;margin-top:2px}
+.sugg{display:grid;gap:10px;padding:14px 20px}
+.sug{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;gap:6px}
+.sug-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sug-h b{font-family:var(--f-mono);font-size:12px;color:var(--faint)}
+.sug p{margin:0;font-size:13px}
+.sug .ev{color:var(--muted)}
+.unitbars{padding:6px 20px 16px;display:grid;gap:8px}
+.ub{display:grid;grid-template-columns:minmax(0,13em) minmax(0,1fr) 5em;gap:10px;align-items:center;font-size:13px}
+.ub .t{height:10px;background:var(--sunken);border-radius:5px;overflow:hidden}
+.ub .t i{display:block;height:100%;background:var(--accent);border-radius:5px}
+.ub .t i.low{background:var(--warn)}
+.ub span:last-child{font-family:var(--f-mono);text-align:right}
+@media (max-width:980px){.layout{grid-template-columns:minmax(0,1fr)}.side{position:static;order:2}}
+@media (max-width:640px){.rail{grid-template-columns:repeat(6,minmax(140px,1fr))}.stage-head .io{margin-left:0;min-width:0;max-width:none}.brand small{display:none}.kpi .v{font-size:22px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="seal-mark" aria-hidden="true">分案</div>
+        <div><h1>民意信箱分案工作台</h1><small>A1 去識別化 → A2 理解 → A3 分案 → A4/A5 擬稿 → A6 SLA → A7 月報</small></div>
+      </div>
+      <span class="chip sim" id="dataChip">範例資料</span>
+      <div class="top-actions">
+        <button class="btn" id="btnExport" type="button" title="匯出所有階段結果為 Excel 檔"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v3h16v-3"/></svg>匯出 Excel</button>
+        <button class="btn primary" id="btnRun" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg>執行全流程</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="rail" id="rail" role="tablist" aria-label="流程階段"></nav>
+</div>
+
+<main class="wrap">
+  <div class="layout">
+    <div class="side">
+      <section class="panel" aria-labelledby="h-data">
+        <div class="panel-h"><h2 id="h-data">案件來源</h2><span class="chip" id="rowCount">0 件</span></div>
+        <div class="panel-b">
+          <label class="drop" id="drop" for="fileIn">
+            <strong>拖放或選擇檔案</strong>
+            <span class="note">CSV、XLSX，第一列為欄位名稱</span>
+          </label>
+          <input type="file" id="fileIn" accept=".csv,.xlsx,.xls,.txt" hidden>
+          <button class="btn" id="btnSample" type="button">重新載入範例資料（104 件）</button>
+          <details class="fold" id="mapFold">
+            <summary>欄位對應</summary>
+            <div class="map-grid" id="mapGrid" style="margin-top:10px"></div>
+          </details>
+          <div class="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span>所有運算都在這個瀏覽器分頁內完成，案件內容不會上傳或送給任何服務。真實案件仍應依機關規定在地端處理。</span></div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-cfg">
+        <div class="panel-h"><h2 id="h-cfg">執行參數</h2></div>
+        <div class="panel-b">
+          <div class="field">
+            <span class="lbl">A1 送往下游的欄位（白名單）</span>
+            <label class="toggle"><input type="checkbox" checked disabled><span>案號、主旨、遮罩後內容<small>預設，固定送出</small></span></label>
+            <label class="toggle"><input type="checkbox" id="wlTime"><span>立案時間、結案時間<small>A6 SLA 需要；非個資，須機關核定</small></span></label>
+            <label class="toggle"><input type="checkbox" id="wlSource"><span>來源<small>民意信箱、1999 等</small></span></label>
+            <label class="toggle"><input type="checkbox" id="wlLoc"><span>遮罩後地點<small>保留到路段，巷以下遮為 [門牌n]</small></span></label>
+          </div>
+          <div class="field">
+            <span class="lbl">工作日曆（A6）</span>
+            <div class="seg" id="calMode" role="group" aria-label="工作日曆來源">
+              <button type="button" data-v="agency">機關日曆</button>
+              <button type="button" data-v="sim">模擬</button>
+              <button type="button" data-v="none">未提供</button>
+            </div>
+            <textarea id="holidays" aria-label="非工作日清單" placeholder="每行一個日期，例：2026-10-09"></textarea>
+            <span class="note" id="calNote"></span>
+          </div>
+          <div class="field">
+            <label for="asOf">資料截止時間（A6 今日）</label>
+            <input type="datetime-local" id="asOf">
+          </div>
+          <label class="toggle"><input type="checkbox" id="simSla"><span>模擬 SLA 資料<small>以截止時間為基準，產生收文、結案、轉派、展延紀錄（亂數種子固定）</small></span></label>
+          <div class="field">
+            <span class="lbl">分案規則</span>
+            <div class="note">內建：新竹市政府公文分案規則參考 V3.7.2（2026/10/18）擷取 16 類常見陳情。<button class="btn" type="button" id="btnRules" style="margin-top:8px">檢視規則表</button></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel" id="stage" aria-live="polite"></section>
+  </div>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="drTitle">
+  <div class="dr-h"><span class="lbl">案件履歷</span><h3 id="drTitle"></h3><span id="drStamps" style="display:flex;gap:6px;flex-wrap:wrap"></span><button class="btn" id="drClose" type="button" style="margin-left:auto">關閉</button></div>
+  <div class="dr-b" id="drBody"></div>
+</aside>
+<div class="toast" id="toast" role="status"></div>
+
+<script id="sample" type="application/json">{"cases":[{"案號":"DEMO-001","主旨":"巷口路燈不亮、人行道破損","內容":"我是住在三民區測試路15巷3號4樓的王先生，電話0912-345-678。巷口路燈已經一週不亮，人行道地磚也破損翹起，晚上走路很危險，之前已反映多次都沒有改善。","收文時間":"115.11.10 18時20分00秒","結案時間":"","來源":"1999","地址":"高雄市三民區測試路15巷3號4樓","陳情人姓名":"王大明","電話":"0912-345-678"},{"案號":"DEMO-002","主旨":"鄰居深夜喧嘩並長期違停","內容":"我是他樓上的住戶，樓下住戶每晚十二點後唱卡拉OK很吵，還把車長期違規停車在消防栓前面。請回信到 abc123@example.com。","收文時間":"115.11.09 09時05分00秒","結案時間":"","來源":"民意信箱","地址":"","陳情人姓名":"陳小美","Email":"abc123@example.com"},{"案號":"DEMO-003","主旨":"Fallen tree branch and broken street light","內容":"Dear Sir or Madam, a large tree branch has fallen near Test Road and is blocking part of the sidewalk. The street light there is also broken, so it is very dark at night. Please help. Contact: +886 912 000 111.","收文時間":"115.11.11 14時30分00秒","結案時間":"","來源":"民意信箱","地址":"","電話":"+886 912 000 111"},{"案號":"DEMO-004","主旨":"社區聯署反映工廠廢氣","內容":"本社區住戶已發起聯署，附近工廠每天傍晚排放刺鼻廢氣，已有住戶感到頭暈不適。若再不改善，我們將集結到市府陳情抗議。陳情人身分證A123456789。","收文時間":"115.11.12 08時40分00秒","結案時間":"","來源":"民意信箱","地址":"","身分證號":"A123456789"},{"案號":"112000001","主旨":"流浪動物處理","內容":"該區域常有流浪狗聚集追車，請協助處理。","收文時間":"112.05.31 16時00分00秒","結案時間":"112.06.05 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路49號"},{"案號":"112000002","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.10.17 22時00分00秒","結案時間":"112.10.24 22時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路88號"},{"案號":"112000003","主旨":"檢舉違規停車","內容":"該地點長期有車輛違規停車，嚴重影響行人通行。","收文時間":"112.05.09 13時00分00秒","結案時間":"112.05.10 13時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路96號"},{"案號":"112000004","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.04.30 17時00分00秒","結案時間":"112.05.01 17時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路41號"},{"案號":"112000005","主旨":"交通號誌異常","內容":"十字路口紅綠燈故障，容易引發交通事故。","收文時間":"112.06.21 16時00分00秒","結案時間":"112.06.23 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路80號"},{"案號":"112000006","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.04.11 16時00分00秒","結案時間":"112.04.18 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路100號"},{"案號":"112000007","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.10.14 02時00分00秒","結案時間":"112.10.16 02時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路62號"},{"案號":"112000008","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.01.08 07時00分00秒","結案時間":"112.01.14 07時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路48號"},{"案號":"112000009","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.10.04 07時00分00秒","結案時間":"112.10.11 07時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路44號"},{"案號":"112000010","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.06.15 17時00分00秒","結案時間":"112.06.19 17時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路52號"},{"案號":"112000011","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.01.16 21時00分00秒","結案時間":"112.01.23 21時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路39號"},{"案號":"112000012","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.10.02 02時00分00秒","結案時間":"112.10.03 02時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路55號"},{"案號":"112000013","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.07.07 18時00分00秒","結案時間":"112.07.08 18時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路81號"},{"案號":"112000014","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.03.19 18時00分00秒","結案時間":"112.03.20 18時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路79號"},{"案號":"112000015","主旨":"檢舉違規停車","內容":"該地點長期有車輛違規停車，嚴重影響行人通行。","收文時間":"112.06.23 18時00分00秒","結案時間":"112.06.26 18時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路7號"},{"案號":"112000016","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.06.12 22時00分00秒","結案時間":"112.06.16 22時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路1號"},{"案號":"112000017","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.01.26 17時00分00秒","結案時間":"112.02.02 17時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路84號"},{"案號":"112000018","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.09.15 15時00分00秒","結案時間":"112.09.18 15時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路29號"},{"案號":"112000019","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.04.03 15時00分00秒","結案時間":"112.04.06 15時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路65號"},{"案號":"112000020","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.03.28 05時00分00秒","結案時間":"112.03.31 05時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路84號"},{"案號":"112000021","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.08.05 16時00分00秒","結案時間":"112.08.10 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路15號"},{"案號":"112000022","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.05.08 17時00分00秒","結案時間":"112.05.11 17時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路80號"},{"案號":"112000023","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.08.11 18時00分00秒","結案時間":"112.08.13 18時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路60號"},{"案號":"112000024","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.08.04 14時00分00秒","結案時間":"112.08.10 14時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路23號"},{"案號":"112000025","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.01.11 03時00分00秒","結案時間":"112.01.18 03時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路43號"},{"案號":"112000026","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.02.20 18時00分00秒","結案時間":"112.02.27 18時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路96號"},{"案號":"112000027","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.07.06 03時00分00秒","結案時間":"112.07.13 03時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路100號"},{"案號":"112000028","主旨":"公園設施損壞","內容":"公園內的兒童遊樂設施損壞，可能有安全疑慮。","收文時間":"112.08.07 05時00分00秒","結案時間":"112.08.10 05時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路10號"},{"案號":"112000029","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.01.29 16時00分00秒","結案時間":"112.02.01 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路49號"},{"案號":"112000030","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.08.19 05時00分00秒","結案時間":"112.08.24 05時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路10號"},{"案號":"112000031","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.03.18 22時00分00秒","結案時間":"112.03.25 22時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路77號"},{"案號":"112000032","主旨":"檢舉違規停車","內容":"該地點長期有車輛違規停車，嚴重影響行人通行。","收文時間":"112.02.14 02時00分00秒","結案時間":"112.02.20 02時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路25號"},{"案號":"112000033","主旨":"流浪動物處理","內容":"該區域常有流浪狗聚集追車，請協助處理。","收文時間":"112.04.20 07時00分00秒","結案時間":"112.04.26 07時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路97號"},{"案號":"112000034","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.08.10 21時00分00秒","結案時間":"112.08.17 21時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路94號"},{"案號":"112000035","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.03.10 18時00分00秒","結案時間":"112.03.16 18時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路12號"},{"案號":"112000036","主旨":"交通號誌異常","內容":"十字路口紅綠燈故障，容易引發交通事故。","收文時間":"112.10.25 11時00分00秒","結案時間":"112.10.30 11時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路43號"},{"案號":"112000037","主旨":"公園設施損壞","內容":"公園內的兒童遊樂設施損壞，可能有安全疑慮。","收文時間":"112.07.10 01時00分00秒","結案時間":"112.07.15 01時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路34號"},{"案號":"112000038","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.08.23 16時00分00秒","結案時間":"112.08.27 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路97號"},{"案號":"112000039","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.06.29 03時00分00秒","結案時間":"112.07.04 03時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路29號"},{"案號":"112000040","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.04.27 12時00分00秒","結案時間":"112.05.02 12時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路37號"},{"案號":"112000041","主旨":"流浪動物處理","內容":"該區域常有流浪狗聚集追車，請協助處理。","收文時間":"112.07.19 21時00分00秒","結案時間":"112.07.25 21時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路46號"},{"案號":"112000042","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.07.15 19時00分00秒","結案時間":"112.07.21 19時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路74號"},{"案號":"112000043","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.08.15 07時00分00秒","結案時間":"112.08.18 07時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路96號"},{"案號":"112000044","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.03.28 03時00分00秒","結案時間":"112.04.01 03時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路36號"},{"案號":"112000045","主旨":"檢舉違規停車","內容":"該地點長期有車輛違規停車，嚴重影響行人通行。","收文時間":"112.02.27 16時00分00秒","結案時間":"112.02.28 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路28號"},{"案號":"112000046","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.06.27 01時00分00秒","結案時間":"112.06.28 01時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路67號"},{"案號":"112000047","主旨":"檢舉違規停車","內容":"該地點長期有車輛違規停車，嚴重影響行人通行。","收文時間":"112.04.20 02時00分00秒","結案時間":"112.04.23 02時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路62號"},{"案號":"112000048","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.04.01 09時00分00秒","結案時間":"112.04.07 09時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路83號"},{"案號":"112000049","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.01.04 06時00分00秒","結案時間":"112.01.08 06時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路66號"},{"案號":"112000050","主旨":"公園設施損壞","內容":"公園內的兒童遊樂設施損壞，可能有安全疑慮。","收文時間":"112.04.22 09時00分00秒","結案時間":"112.04.23 09時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路97號"},{"案號":"112000051","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.09.05 21時00分00秒","結案時間":"112.09.11 21時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路73號"},{"案號":"112000052","主旨":"檢舉違規停車","內容":"該地點長期有車輛違規停車，嚴重影響行人通行。","收文時間":"112.08.04 16時00分00秒","結案時間":"112.08.11 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路41號"},{"案號":"112000053","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.05.23 08時00分00秒","結案時間":"112.05.24 08時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路38號"},{"案號":"112000054","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.02.10 12時00分00秒","結案時間":"112.02.17 12時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路9號"},{"案號":"112000055","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.05.23 14時00分00秒","結案時間":"112.05.24 14時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路87號"},{"案號":"112000056","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.05.11 03時00分00秒","結案時間":"112.05.16 03時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路78號"},{"案號":"112000057","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.05.10 11時00分00秒","結案時間":"112.05.14 11時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路23號"},{"案號":"112000058","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.07.01 22時00分00秒","結案時間":"112.07.08 22時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路93號"},{"案號":"112000059","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.06.18 09時00分00秒","結案時間":"112.06.20 09時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路89號"},{"案號":"112000060","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.09.05 16時00分00秒","結案時間":"112.09.07 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路62號"},{"案號":"112000061","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.03.18 05時00分00秒","結案時間":"112.03.23 05時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路63號"},{"案號":"112000062","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.06.15 09時00分00秒","結案時間":"112.06.20 09時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路48號"},{"案號":"112000063","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.04.21 11時00分00秒","結案時間":"112.04.26 11時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路45號"},{"案號":"112000064","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.05.24 06時00分00秒","結案時間":"112.05.31 06時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路79號"},{"案號":"112000065","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.07.22 05時00分00秒","結案時間":"112.07.23 05時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路92號"},{"案號":"112000066","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.09.28 20時00分00秒","結案時間":"112.09.30 20時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路77號"},{"案號":"112000067","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.07.24 00時00分00秒","結案時間":"112.07.29 00時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路97號"},{"案號":"112000068","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.08.30 14時00分00秒","結案時間":"112.09.04 14時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路83號"},{"案號":"112000069","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.06.11 14時00分00秒","結案時間":"112.06.18 14時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路21號"},{"案號":"112000070","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.03.10 16時00分00秒","結案時間":"112.03.11 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路93號"},{"案號":"112000071","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.10.26 04時00分00秒","結案時間":"112.10.31 04時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路4號"},{"案號":"112000072","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.03.01 19時00分00秒","結案時間":"112.03.05 19時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路91號"},{"案號":"112000073","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.07.17 11時00分00秒","結案時間":"112.07.21 11時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路53號"},{"案號":"112000074","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.05.13 08時00分00秒","結案時間":"112.05.16 08時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路12號"},{"案號":"112000075","主旨":"檢舉違規停車","內容":"該地點長期有車輛違規停車，嚴重影響行人通行。","收文時間":"112.05.10 06時00分00秒","結案時間":"112.05.13 06時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路15號"},{"案號":"112000076","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.02.15 08時00分00秒","結案時間":"112.02.18 08時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路5號"},{"案號":"112000077","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.01.07 20時00分00秒","結案時間":"112.01.13 20時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路55號"},{"案號":"112000078","主旨":"空氣汙染反映","內容":"附近工廠排放廢氣，產生刺鼻異味。","收文時間":"112.01.17 08時00分00秒","結案時間":"112.01.18 08時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路47號"},{"案號":"112000079","主旨":"公園設施損壞","內容":"公園內的兒童遊樂設施損壞，可能有安全疑慮。","收文時間":"112.03.13 23時00分00秒","結案時間":"112.03.19 23時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路19號"},{"案號":"112000080","主旨":"交通號誌異常","內容":"十字路口紅綠燈故障，容易引發交通事故。","收文時間":"112.09.06 21時00分00秒","結案時間":"112.09.12 21時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路77號"},{"案號":"112000081","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.02.22 21時00分00秒","結案時間":"112.02.23 21時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路77號"},{"案號":"112000082","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.09.05 10時00分00秒","結案時間":"112.09.06 10時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路60號"},{"案號":"112000083","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.03.19 05時00分00秒","結案時間":"112.03.21 05時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路36號"},{"案號":"112000084","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.08.20 05時00分00秒","結案時間":"112.08.27 05時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路44號"},{"案號":"112000085","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.10.07 18時00分00秒","結案時間":"112.10.13 18時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路56號"},{"案號":"112000086","主旨":"路燈不亮","內容":"巷弄內路燈已經連續幾天不亮，影響夜間安全。","收文時間":"112.09.25 17時00分00秒","結案時間":"112.10.01 17時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路99號"},{"案號":"112000087","主旨":"交通號誌異常","內容":"十字路口紅綠燈故障，容易引發交通事故。","收文時間":"112.06.18 06時00分00秒","結案時間":"112.06.25 06時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路36號"},{"案號":"112000088","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.03.02 06時00分00秒","結案時間":"112.03.07 06時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路64號"},{"案號":"112000089","主旨":"流浪動物處理","內容":"該區域常有流浪狗聚集追車，請協助處理。","收文時間":"112.05.05 12時00分00秒","結案時間":"112.05.07 12時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路35號"},{"案號":"112000090","主旨":"流浪動物處理","內容":"該區域常有流浪狗聚集追車，請協助處理。","收文時間":"112.04.13 19時00分00秒","結案時間":"112.04.18 19時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路18號"},{"案號":"112000091","主旨":"反映道路破損","內容":"民眾反映某路段路面有坑洞，影響行車安全，請派員修復。","收文時間":"112.08.10 22時00分00秒","結案時間":"112.08.11 22時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路32號"},{"案號":"112000092","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.04.29 04時00分00秒","結案時間":"112.05.01 04時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路75號"},{"案號":"112000093","主旨":"檢舉違規停車","內容":"該地點長期有車輛違規停車，嚴重影響行人通行。","收文時間":"112.03.21 09時00分00秒","結案時間":"112.03.26 09時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路69號"},{"案號":"112000094","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.01.02 17時00分00秒","結案時間":"112.01.07 17時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路92號"},{"案號":"112000095","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.05.08 14時00分00秒","結案時間":"112.05.09 14時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路56號"},{"案號":"112000096","主旨":"垃圾未清運","內容":"定點垃圾未依規定時間清運，造成環境髒亂。","收文時間":"112.04.06 11時00分00秒","結案時間":"112.04.07 11時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路3號"},{"案號":"112000097","主旨":"交通號誌異常","內容":"十字路口紅綠燈故障，容易引發交通事故。","收文時間":"112.01.13 12時00分00秒","結案時間":"112.01.16 12時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路37號"},{"案號":"112000098","主旨":"流浪動物處理","內容":"該區域常有流浪狗聚集追車，請協助處理。","收文時間":"112.06.08 03時00分00秒","結案時間":"112.06.13 03時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路57號"},{"案號":"112000099","主旨":"水溝不通","內容":"水溝疑似阻塞，下雨天容易積水，請協助清淤。","收文時間":"112.07.31 16時00分00秒","結案時間":"112.08.01 16時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路60號"},{"案號":"112000100","主旨":"噪音擾人","內容":"附近工廠或鄰居深夜發出噪音，影響睡眠品質。","收文時間":"112.07.10 21時00分00秒","結案時間":"112.07.17 21時00分00秒","來源":"民意信箱","地址":"高雄市三民區測試路57號"}]}</script>
+<script>
+"use strict";
+/* ========= 規則與參照 ========= */
+const RULE_VER = "局處職掌資料架構_範例_V3.7.2（2026/10/18）";
+const U = {
+  "1303":"交通處交通工程與管理科","1701":"養工處道路養護科","1702":"養工處景觀維護科","9500":"新竹市動物保護及防疫所",
+  "0501":"產發處漁業科","0503":"產發處工商科","4717":"環保局清潔隊","0908":"工務處水利工程科","4702":"環保局空氣品質維護科",
+  "4122":"警察局交通警察隊","4100":"新竹市警察局","4700":"新竹市環境保護局"
+};
+/* 每類：關鍵字、訴求、危安判斷、候選單位（含依據與條件）、待承辦單位填寫事項 */
+const CATS = [
+  {id:"light",name:"路燈維護",kw:["路燈","street light","streetlight"],demand:"修復故障路燈",expect:"修復路燈",
+   danger:{no:true},c:[{u:"1701",ev:"業務分工規則 M010、P065；職掌 1701-005",why:"路燈裝設維護屬養工處道路養護科",ex:"工務處：舊備忘錄已於 115/10/16 改為養工處（M010）"}],todo:"檢修日期與修復情形",en:"repair of the street light"},
+  {id:"signal",name:"交通號誌",kw:["紅綠燈","號誌","traffic light","signal"],demand:"修復路口故障號誌",expect:"修復號誌",
+   danger:{yes:["故障","不亮","壞","閃","broken"],conf:"高"},c:[{u:"1303",ev:"業務分工規則 P039；職掌 1303-003",why:"交通號誌維護屬交通處交通工程與管理科"}],todo:"派員檢修日期與修復情形",en:"repair of the traffic signal"},
+  {id:"road",name:"道路維護",kw:["坑洞","路面","柏油","凹陷","道路破損","pothole"],demand:"修補路面坑洞",expect:"派員修補",
+   danger:{yes:["坑洞","塌陷","凹陷","pothole"],conf:"中"},c:[{u:"1701",ev:"業務分工規則 P061；職掌 1701-001、1701-003",why:"道路維護由養工處道路養護科辦理"}],review:"路段未定位；若為中央管道路則非本府權責",todo:"會勘日期、修補方式與完成日期",en:"repair of the road surface"},
+  {id:"sidewalk",name:"人行道",kw:["人行道地磚","人行道破損","人行道也破損","人行道翹","人行道高低差"],demand:"修繕破損人行道",expect:"修繕人行道",
+   danger:{yes:["翹起","坑洞","高低差"],conf:"低"},c:[{u:"1701",ev:"業務分工規則 M006；職掌 1701-001",why:"人行道設施本體破損由養工處道路養護科辦理"}],todo:"會勘與修繕安排",en:"repair of the sidewalk"},
+  {id:"dog",name:"流浪動物",kw:["流浪狗","流浪犬","野狗","流浪貓","stray dog"],demand:"處理流浪犬",expect:"巡查或捕捉",
+   danger:{yes:["追車","咬","攻擊","bite"],conf:"中"},c:[{u:"9500",ev:"業務分工規則 P117",why:"流浪犬貓由動物保護及防疫所辦理"}],todo:"派員巡查或捕捉日期與處理情形",en:"handling of stray dogs"},
+  {id:"park",name:"公園管理",kw:["遊樂設施","遊具","溜滑梯","盪鞦韆","公園設施","playground"],demand:"修復公園設施",expect:"修復或暫停使用",
+   danger:{yes:["損壞","斷裂","鬆脫","安全疑慮","broken"],conf:"中"},c:[{u:"1702",ev:"業務分工規則 P062；職掌 1702-001",why:"既有公園設施維護屬養工處景觀維護科",ex:"工務處土木工程科：P035 限新建公園"},{u:"0501",ev:"業務分工規則 P014",why:"僅當公園位於新竹漁港、南寮環保公園或漁港環保公園範圍內",cond:"公園位於 P014 所列範圍"}],review:"公園名稱未知，需確認是否在 P014 所列範圍",todo:"會勘結果，以及設施修復或暫停使用之安排",en:"repair of park facilities"},
+  {id:"tree",name:"樹木植栽",kw:["路樹","樹木","樹枝","修剪","倒樹","tree","branch"],demand:"處理樹木倒塌或修剪",expect:"移除或修剪",
+   danger:{yes:["倒","傾倒","斷落","掉落","fallen","blocking"],conf:"高"},c:[{u:"1702",ev:"業務分工規則 M002、P060；職掌 1702-003",why:"樹木植栽維護屬養工處景觀維護科"}],todo:"清除或修剪日期與處理情形",en:"removal of the fallen tree branch"},
+  {id:"ditch",name:"排水溝渠",kw:["水溝","側溝","清淤","排水不良","積水"],demand:"清淤阻塞水溝",expect:"清淤",
+   danger:{yes:["淹水","淹進"],unsure:["積水"],conf:"低"},c:[{u:"4717",ev:"業務分工規則 P097、M008；職掌 4717-001",why:"側溝清溝由環保局清潔隊辦理",ex:"區公所（P115）與養工處（P066）負責側溝本體維護，非清淤"},{u:"0908",ev:"業務分工規則 P032、M009",why:"僅當阻塞的是大排水溝或雨水下水道",cond:"水溝為大排或雨水下水道"}],review:"需確認水溝類型（一般側溝或大排／雨水下水道）",todo:"清淤日期與結果",en:"clearing of the blocked drain"},
+  {id:"air",name:"空氣污染",kw:["廢氣","空汙","空污","空氣污染","異味","臭味","黑煙","fumes"],demand:"稽查廢氣排放",expect:"稽查並改善",
+   danger:{yes:["瓦斯","頭暈","化學","dizzy"],unsure:["刺鼻","異味"],conf:"低"},c:[{u:"4702",ev:"業務分工規則 P098；職掌 4702-001",why:"空氣污染防治屬環保局空氣品質維護科"},{u:"0503",ev:"職掌 0503-002",why:"僅當涉及未登記工廠，需工廠管理單位協助",cond:"涉及未登記工廠（協辦）"}],todo:"稽查日期、稽查結果及後續處置",report:true,en:"inspection of the emissions"},
+  {id:"noise",name:"噪音",kw:["噪音","很吵","吵鬧","喧嘩","卡拉OK","noise"],demand:"查處噪音",expect:"查處並改善",
+   danger:{no:true},c:[{u:"4702",ev:"業務分工規則 P098；職掌 4702-001",why:"工廠等噪音屬環保局噪音管制",cond:"噪音來源為工廠或營業場所"},{u:"4100",ev:"職掌 4120-021（社會秩序維護法）",why:"住戶深夜生活噪音可能依社會秩序維護法處理；分工規則無明確條目，依據較弱",cond:"噪音來源為住戶"}],review:"噪音來源未確認；住戶噪音在分工規則中沒有明確條目",todo:"噪音來源確認結果，以及稽查或處理情形",report:true,en:"handling of the noise"},
+  {id:"parking",name:"違規停車",kw:["違規停車","違停","併排停車","illegal parking"],demand:"取締違規停車",expect:"加強取締",
+   danger:{yes:["消防栓"],conf:"低"},c:[{u:"4122",ev:"業務分工規則 P083；職掌 4122-025",why:"違規停車由警察局交通警察隊拖吊、舉發"}],todo:"加強取締或巡查之安排與結果",report:true,en:"enforcement against illegal parking"},
+  {id:"garbage",name:"垃圾清運",kw:["垃圾","清運","垃圾車","garbage"],demand:"改善垃圾清運",expect:"清運並改善",
+   danger:{no:true},c:[{u:"4717",ev:"職掌 4717-001",why:"廢棄物清運由環保局清潔隊執行",ex:"環境衛生管理科（4704-001）為政策規劃"}],todo:"清運情形與後續改善措施",en:"garbage collection"},
+  {id:"carcass",name:"動物屍體",kw:["動物屍體","死狗","死貓","屍體"],demand:"清除動物屍體",expect:"清除",
+   danger:{no:true},c:[{u:"4717",ev:"業務分工規則 P106",why:"道路或公共場所動物屍體由環保局清潔隊處理"}],todo:"清除日期",en:"removal of the animal carcass"},
+  {id:"weeds",name:"雜草",kw:["雜草","除草"],demand:"清除雜草",expect:"除草",
+   danger:{no:true},c:[{u:"1702",ev:"業務分工規則 M001",why:"人行道雜草由養工處景觀維護科處理",cond:"位於人行道"},{u:"4700",ev:"業務分工規則 M003",why:"道路邊（非人行道）雜草由環保局處理",cond:"位於道路邊"}],review:"需確認雜草位置（人行道或路邊）",todo:"除草日期",en:"weed removal"},
+  {id:"wire",name:"電線垂落",kw:["電線","垂落","電纜"],demand:"處理垂落線路",expect:"派員處理",
+   danger:{yes:["垂落","掉落","斷"],conf:"高"},c:[{u:"1701",ev:"業務分工規則 P064",why:"非台電、電信、號誌、攝影機之線路垂落由養工處道路養護科處理"},{u:"0503",ev:"業務分工規則 P019",why:"台電線路由產發處工商科聯繫處理",cond:"屬台電線路"}],review:"需確認線路所屬單位",todo:"派員處理日期與結果",en:"handling of the hanging wires"},
+];
+const DANGER_ANY = ["傾倒","塌陷","瓦斯","漏電","冒火","火花","淹水","頭暈","受傷"];
+const PROTEST = ["聯署","連署","自救會","抗議","陳抗","集結"];
+const REPEAT = ["已反映多次","反映多次","多次反映","再次反映","之前陳情","之前已反映","一直沒處理","都沒有改善","還是沒"];
+const URGENT_TIME = ["明天","今晚","活動當天","即將"];
+
+/* ========= 工具 ========= */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = { get(k, d){ try{ const v = localStorage.getItem("pw:"+k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+                set(k, v){ try{ localStorage.setItem("pw:"+k, JSON.stringify(v)); }catch(e){} } };
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 2600); }
+function rng(seed){ let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+const pad = n => String(n).padStart(2, "0");
+const ymd = d => d ? `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` : "";
+const ymdhm = d => d ? `${ymd(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}` : "";
+function parseDate(v){
+  if (v == null || v === "") return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === "number") { if (window.XLSX && XLSX.SSF) { const o = XLSX.SSF.parse_date_code(v); if (o) return new Date(o.y, o.m-1, o.d, o.H, o.M); } return null; }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{2,3})[.\/-](\d{1,2})[.\/-](\d{1,2})(?:\s+(\d{1,2})[時:](\d{1,2}))?/);
+  if (m && +m[1] < 200) return new Date(+m[1] + 1911, +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0));
+  m = s.match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0));
+  return null;
+}
+
+/* ========= A1 遮罩 ========= */
+const ZW = /[​-‏﻿]/;
+const MASK_RULES = [
+  ["身分證號", /(?<![A-Za-z0-9])[A-Za-z][12ABCDabcd89]\d{8}(?![0-9])/g],
+  ["Email", /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g],
+  ["電話", /(?:\+?886[-\s]?9\d{2}|09\d{2})[-\s]?\d{3}[-\s]?\d{3}|\(?0\d{1,2}\)?[-\s]?\d{3,4}[-\s]?\d{4}(?:\s*(?:#|分機)\s*\d+)?/g],
+  ["車牌", /(?<![A-Za-z0-9])(?:[A-Z]{2,3}-?\d{3,4}|\d{3,4}-?[A-Z]{2,3})(?![A-Za-z0-9])/g],
+  ["門牌", /(?:\d+|[一二三四五六七八九十]+)\s*(?:巷|弄)(?:\s*\d+\s*弄)?(?:\s*\d+(?:之\d+)?\s*號)?(?:\s*\d+\s*樓(?:之\d+)?)?|\d+(?:之\d+)?\s*號(?:\s*\d+\s*樓(?:之\d+)?)?(?:\s*\d+\s*室)?/g],
+  ["姓名", /[一-鿿](?:先生|小姐|太太|女士)|[一-鿿]姓(?:里民|民眾|男子|女子|住戶|屋主)/g],
+  ["關係", /我(?:是|住在)?(?:他|她|其)?的?(?:隔壁|樓上|樓下|對面|正對面|前夫|前妻|房東|房客|同事|員工|公司的員工)[^，。,]{0,6}?的?(?:住戶|鄰居|員工)?/g],
+];
+function normMap(text){
+  const n = [], idx = [];
+  const chars = Array.from(text || "");
+  let pos = 0;
+  for (const ch of chars){ if (!ZW.test(ch)){ for (const c of ch.normalize("NFKC")){ n.push(c); idx.push(pos); } } pos += ch.length; }
+  idx.push(pos);
+  return { n: n.join(""), idx, nChars: n };
+}
+function applyMask(text, finder, ctx){
+  const { n, idx, nChars } = normMap(text);
+  // finder works on string indexes; map via char array offsets
+  const offs = []; let o = 0; for (const c of nChars){ offs.push(o); o += c.length; } offs.push(o);
+  const toChar = new Map(offs.map((v, i) => [v, i]));
+  const spans = [];
+  for (const [cat, a, b] of finder(n)){
+    const ca = toChar.get(a), cb = toChar.get(b); if (ca == null || cb == null) continue;
+    if (spans.some(s => ca < s[1] && s[0] < cb)) continue;
+    spans.push([ca, cb, cat, n.slice(a, b)]);
+  }
+  spans.sort((x, y) => x[0] - y[0]);
+  let out = "", last = 0;
+  for (const [ca, cb, cat, val] of spans){
+    const oa = idx[ca], ob = idx[cb];
+    out += text.slice(last, oa) + token(cat, val, ctx); last = ob; ctx.stats[cat] = (ctx.stats[cat] || 0) + 1;
+  }
+  return out + text.slice(last);
+}
+function token(cat, val, ctx){
+  const key = cat + "\u0000" + val;
+  if (!ctx.map.has(key)){ ctx.cnt[cat] = (ctx.cnt[cat] || 0) + 1; ctx.map.set(key, `[${cat}${ctx.cnt[cat]}]`); }
+  return ctx.map.get(key);
+}
+function maskText(text, idVals, ctx){
+  let t = String(text || "");
+  for (const [cat, v] of idVals){
+    if (!v || v.length < 2) continue;
+    const vv = v.normalize("NFKC");
+    t = applyMask(t, n => { const r = []; let i = n.indexOf(vv); while (i >= 0){ r.push([cat, i, i + vv.length]); i = n.indexOf(vv, i + vv.length); } return r; }, ctx);
+  }
+  for (const [cat, rx] of MASK_RULES){
+    t = applyMask(t, n => { const r = []; rx.lastIndex = 0; let m; while ((m = rx.exec(n))){ if (!m[0]) { rx.lastIndex++; continue; } if (/^\[[^\]]+\]$/.test(m[0])) continue; if (cat === "電話" && /^(1999|110|119)$/.test(m[0])) continue; r.push([cat, m.index, m.index + m[0].length]); } return r; }, ctx);
+  }
+  return t;
+}
+function residual(text){
+  const t = String(text || "").replace(/\[[^\]]+\]/g, " ");
+  return MASK_RULES.filter(([, rx]) => { rx.lastIndex = 0; const r = rx.test(t); rx.lastIndex = 0; return r; }).map(([c]) => c);
+}
+function maskLocation(addr, ctx){
+  if (!addr) return "";
+  const s = String(addr).normalize("NFKC");
+  const m = s.match(/^(.*?(?:路|街|大道)(?:[一二三四五六七八九十\d]+段)?)/);
+  if (!m) return token("門牌", s, ctx);
+  const rest = s.slice(m[1].length).trim();
+  return m[1] + (rest ? token("門牌", rest, ctx) : "");
+}
+
+/* ========= 狀態 ========= */
+const STAGES = [
+  {id:"a1",code:"A1",name:"去識別化",skill:"case-deidentification",desc:"遮罩姓名、電話、Email、門牌、身分證號與檢舉關係，只把白名單欄位送往下游；附件與身分欄位不送出。",inp:"原始案件",out:"遮罩後案件、風險提示、處理報告"},
+  {id:"a2",code:"A2",name:"案件理解",skill:"case-understanding",desc:"摘要、拆解訴求、擷取地點，標記危安、急迫、陳抗與重複陳情；急迫案件產出管考通知草稿。",inp:"A1 遮罩後案件",out:"訴求清單、標記、急迫通知"},
+  {id:"a3",code:"A3",name:"分案建議",skill:"dispatch-recommend",desc:"依分案規則比對業務分工與職掌，給出最多 3 個候選單位與依據；資料不足或權責不明時交人工確認。",inp:"A2 訴求清單＋分案規則",out:"候選單位、依據、人工確認原因"},
+  {id:"a4",code:"A4·A5",name:"回覆擬稿",skill:"petition-reply-drafting",desc:"擬正式版與精簡版回覆、英文案件附英文版；跨單位案件以訴求為主軸彙整成一封。草稿須經人工核定才能對外。",inp:"A3 分案＋承辦單位說明",out:"回覆草稿、待填寫事項、自檢結果"},
+  {id:"a6",code:"A6",name:"SLA 追蹤",skill:"sla-tracking-quality-optimization",desc:"依工作日曆算 3 個工作天期限，產出今日到期提醒、主管彙整、逾期、列管與重複轉派清單。",inp:"A3 承辦單位＋收文時間＋日曆",out:"期限表、提醒草稿、四份清單"},
+  {id:"a7",code:"A7",name:"品質月報",skill:"sla-tracking-quality-optimization",desc:"彙整時效與分案品質指標，從流程訊號提出規則、提示詞與資料的調整建議草案，經核可後才上線。",inp:"A1–A6 結果",out:"指標、各單位達成率、調整建議草案"},
+];
+const S = {
+  raw: [], cols: [], map: {}, dataLabel: "範例資料", isSample: true,
+  cfg: Object.assign({ wlTime: true, wlSource: true, wlLoc: true, calMode: "sim", holidays: "2026-10-09\n2026-10-26\n2026-12-25", asOf: "2026-11-12T09:00", simSla: true }, store.get("cfg", {})),
+  res: null, sel: store.get("sel", "a1"), states: {}, filter: {}, q: {},
+};
+const MAP_FIELDS = [
+  ["id","案號",/案號|案件編號|case.?id|編號/i],["subject","主旨",/主旨|案由|subject|標題/i],["content","內容",/內容|陳情內容|content|說明/i],
+  ["received","收文時間",/收文|立案|分案日期|投書|received/i],["closed","結案時間",/結案|回覆日期|closed/i],["source","來源",/來源|管道|source/i],
+  ["address","地址／地點",/地址|地點|address/i],["reply","承辦單位處理說明",/處理說明|處理情形|單位回覆|reply/i],
+  ["name","陳情人姓名（身分欄）",/姓名|name/i],["phone","電話（身分欄）",/電話|手機|phone/i],["email","Email（身分欄）",/email|信箱/i],["idno","身分證號（身分欄）",/身分證|id.?no/i],
+];
+function autoMap(cols){
+  const m = {};
+  for (const [k,, rx] of MAP_FIELDS){
+    let hit = cols.find(c => rx.test(c) && !Object.values(m).includes(c));
+    if (k === "received"){ for (const pref of [/收文/, /立案/, /分案日期/, /投書/]){ const h = cols.find(c => pref.test(c)); if (h){ hit = h; break; } } }
+    if (k === "content" && hit && /處理說明/.test(hit)) hit = cols.find(c => /內容/.test(c));
+    m[k] = hit || "";
+  }
+  return m;
+}
+
+/* ========= 流程引擎 ========= */
+function runA1(){
+  const m = S.map, out = [], stats = {}, risk = [];
+  let rescan = 0, manual = 0;
+  const idCols = [["姓名", m.name],["電話", m.phone],["Email", m.email],["身分證號", m.idno]].filter(x => x[1]);
+  for (const r of S.raw){
+    const ctx = { map: new Map(), cnt: {}, stats };
+    const idVals = idCols.map(([cat, col]) => [cat, String(r[col] ?? "").trim()]).filter(x => x[1]);
+    const subj0 = String(r[m.subject] ?? ""), body0 = String(r[m.content] ?? "");
+    let subj = maskText(subj0, idVals, ctx), body = maskText(body0, idVals, ctx);
+    const before = Object.values(stats).reduce((a, b) => a + b, 0);
+    subj = maskText(subj, [], ctx); body = maskText(body, [], ctx);
+    rescan += Object.values(stats).reduce((a, b) => a + b, 0) - before;
+    const rest = residual(subj + " " + body);
+    let status = "完成", why = "";
+    if (!body.trim()){ status = "需人工去識別化"; why = "內容空白或無法擷取文字"; }
+    else if (rest.length){ status = "需人工去識別化"; why = "二次掃描後仍有疑似：" + rest.join("、"); }
+    if (status !== "完成") manual++;
+    const hints = [];
+    if (/鄰居|住戶/.test(body) && !/\[關係/.test(body)) hints.push("提到鄰居或住戶，未指明與陳情人的相對位置，請人工確認是否足以推回陳情人");
+    if (/唯一|里長的|老闆的/.test(body)) hints.push("可能有間接識別資訊");
+    if (hints.length) risk.push(r[m.id]);
+    const masked = [...ctx.map.entries()].map(([k, v]) => ({ token: v, cat: k.split("\u0000")[0] }));
+    const rec = { id: String(r[m.id] ?? ""), subject: subj, content: body, status, why, hint: hints.join("；"), tokens: masked, original: { subject: subj0, content: body0 } };
+    if (S.cfg.wlTime){ rec.received = parseDate(r[m.received]); rec.closed = parseDate(r[m.closed]); }
+    if (S.cfg.wlSource) rec.source = String(r[m.source] ?? "");
+    if (S.cfg.wlLoc) rec.location = maskLocation(r[m.address], ctx);
+    rec.reply = m.reply ? String(r[m.reply] ?? "") : "";
+    out.push(rec);
+  }
+  const removed = S.cols.filter(c => ![m.id, m.subject, m.content, S.cfg.wlTime && m.received, S.cfg.wlTime && m.closed, S.cfg.wlSource && m.source, m.reply].includes(c));
+  return { rows: out, stats, rescan, manual, risk, removed };
+}
+function has(t, arr){ return arr.find(k => t.toLowerCase().includes(k.toLowerCase())); }
+function extractLoc(t){
+  const cross = t.match(/[一-鿿]{1,6}(?:路|街)(?:[一二三四五六七八九十\d]+段)?與[一-鿿]{1,6}(?:路|街)口?/);
+  if (cross) return cross[0];
+  const road = t.match(/[一-鿿]{1,6}(?:路|街|大道)(?:[一二三四五六七八九十\d]+段)?(?:\[門牌\d+\])?/);
+  if (road && !/^(馬路|道路|走路|路面)/.test(road[0])) return road[0];
+  const en = t.match(/(?:near|on|at)\s+([A-Z][A-Za-z]+\s(?:Road|Street|Rd|St))/);
+  if (en) return en[1];
+  const g = t.match(/某路段|該區域|該地點|巷弄內|巷口|十字路口|路口|公園內|附近工廠|定點|[一-鿿]{2,6}公園/);
+  return g ? g[0] : "（內容未提及）";
+}
+function runA2(a1){
+  const rows = [];
+  const seen = [];
+  for (const r of a1.rows){
+    if (r.status !== "完成") continue;
+    const t = r.subject + "。" + r.content;
+    const rest = residual(t);
+    if (rest.length){ rows.push({ id: r.id, status: "需退回去識別化", why: "殘留：" + rest.join("、"), demands: [], flags: {} }); continue; }
+    const cats = CATS.filter(c => has(t, c.kw));
+    // 人行道只在明確提到破損時算一項；路燈與號誌分開
+    const locRaw = r.location || extractLoc(r.content);
+    const demands = cats.map(c => ({ cat: c, text: c.demand, loc: locRaw, expect: c.expect }));
+    let danger = { v: "否", why: "", conf: "高" }, uncertain = null;
+    for (const c of cats){
+      const y = c.danger.yes && has(t, c.danger.yes);
+      if (y){ danger = { v: "是", why: `${c.name}：「${y}」`, conf: c.danger.conf || "中" }; break; }
+      const u = c.danger.unsure && has(t, c.danger.unsure);
+      if (u && !uncertain) uncertain = { v: "不確定", why: `${c.name}：「${u}」`, conf: "低" };
+    }
+    const anyD = has(t, DANGER_ANY);
+    if (anyD && danger.v !== "是") danger = { v: "是", why: `「${anyD}」`, conf: "中" };
+    if (danger.v !== "是" && uncertain) danger = uncertain;
+    const ut = has(t, URGENT_TIME);
+    const urgent = danger.v === "是" ? { v: "是", why: "危安案件" } : ut ? { v: "是", why: `近期期限：「${ut}」` } : { v: danger.v === "不確定" ? "不確定" : "否", why: "" };
+    const pr = has(t, PROTEST); const protest = pr ? { v: "是", why: `「${pr}」` } : { v: "否", why: "" };
+    const rp = has(t, REPEAT);
+    let repeat = rp ? { v: "是", why: `「${rp}」`, sim: [] } : { v: "不確定", why: "無近期案件索引", sim: [] };
+    if (!rp && locRaw && /路|街/.test(locRaw) && !/某路段/.test(locRaw)){
+      const key = locRaw.replace(/\[門牌\d+\]/, "") + "|" + cats.map(c => c.id).join(",");
+      const t0 = r.received ? r.received.getTime() : null;
+      const dup = seen.filter(s => s.key === key && (t0 == null || s.t == null || Math.abs(s.t - t0) <= 30 * 864e5)).map(s => s.id);
+      if (dup.length) repeat = { v: "不確定", why: `同路段同類別 30 天內 ${dup.length} 件，門牌已遮罩，需人工比對`, sim: dup.slice(0, 5) };
+      seen.push({ key, id: r.id, t: t0 });
+    }
+    const en = /[A-Za-z]{3,}/.test(r.content) && (r.content.match(/[A-Za-z]/g) || []).length > r.content.length * 0.5;
+    const units = new Set(cats.map(c => c.c[0].u));
+    const summary = cats.length
+      ? `民眾反映${locRaw && !/未提及/.test(locRaw) ? locRaw : ""}${cats.map(c => c.name).join("、")}問題，期望${[...new Set(cats.map(c => c.expect))].join("、")}。${protest.v === "是" ? "陳情人表示可能集體陳情。" : ""}`
+      : `民眾反映：${r.subject}。（未能對應到已知訴求類別）`;
+    rows.push({ id: r.id, status: "完成", summary, demands, loc: locRaw, locResult: /路|街|Road|Street/.test(locRaw) ? "路段已知，里別待定位" : "待定位",
+      flags: { danger, urgent, protest, repeat }, multi: cats.length > 1, crossUnit: units.size > 1, english: en, hint: r.hint, received: r.received, closed: r.closed, source: r.source, reply: r.reply, content: r.content, subject: r.subject });
+  }
+  return { rows };
+}
+function runA3(a2){
+  const rows = [];
+  for (const r of a2.rows){
+    if (r.status !== "完成"){ continue; }
+    if (!r.demands.length){ rows.push({ id: r.id, mode: "資訊不足", per: [], units: [], review: ["沒有對應的權責規則類別，需人工判斷承辦單位"], urgent: r.flags.danger.v === "是", a2: r }); continue; }
+    const per = r.demands.map(d => ({ demand: d.text, cat: d.cat, cands: d.cat.c.map((c, i) => ({ rank: i + 1, code: c.u, name: U[c.u], why: c.why, ev: c.ev, cond: c.cond || "", ex: c.ex || "" })) }));
+    const units = [...new Set(per.map(p => p.cands[0].code))];
+    const review = [];
+    for (const d of r.demands) if (d.cat.review) review.push(d.cat.review);
+    if (units.length > 1) review.push("跨單位案件：主協辦規則未明，需人工協調");
+    rows.push({ id: r.id, mode: units.length > 1 ? "跨單位" : "單一權責", per, units, review: [...new Set(review)], urgent: r.flags.danger.v === "是" || r.flags.urgent.v === "是", a2: r });
+  }
+  rows.sort((a, b) => (b.urgent - a.urgent) || a.id.localeCompare(b.id));
+  return { rows };
+}
+function rocDate(d){ return d ? `${d.getFullYear() - 1911}年${d.getMonth() + 1}月${d.getDate()}日` : "[陳情日期]"; }
+function runA4(a3){
+  const rows = [];
+  for (const r of a3.rows){
+    const a2 = r.a2;
+    const date = rocDate(a2.received);
+    const hasReply = !!(a2.reply && a2.reply.trim());
+    const paras = [], paraEn = [];
+    paras.push({ t: `[稱謂]您好：有關您於${date}反映${a2.subject}一事，本府已收悉，謝謝您的通報。`, src: "〔來源：AI 擬寫，待確認（無適用範本）〕" });
+    if (r.mode === "資訊不足"){
+      paras.push({ t: `一、您反映的事項，本府正確認權責單位中：【待確認承辦單位】。處理情形如下：【待承辦單位填寫：處理結果或目前進度】`, src: "〔來源：A3 資訊不足，待人工分案〕" });
+    } else {
+      r.per.forEach((p, i) => {
+        const unit = p.cands[0].name;
+        const res = hasReply && r.per.length === 1 ? a2.reply.trim() : `【待承辦單位填寫：${p.cat.todo}】`;
+        const head = r.per.length > 1 ? `${"一二三四五六七八九"[i]}、關於${p.cat.name}：` : "一、";
+        paras.push({ t: `${head}本府已請【待確認承辦單位：分案建議為${unit}】處理。處理情形如下：${res}`, src: r.mode === "跨單位" ? `〔出處：${unit}回覆（待提供）〕` : (hasReply ? "〔來源：承辦單位回覆〕" : "〔來源：A3 分案建議（待分案確認）；處理結果待承辦單位回覆〕") });
+        paraEn.push(`${i + 1}. Regarding the ${p.cat.en}: the case has been referred to [responsible unit to be confirmed: suggested ${unit}]. [Result to be provided by the responsible unit.]`);
+      });
+    }
+    paras.push({ t: "如有其他問題，歡迎與[承辦單位][承辦人]聯繫，電話：[電話]。感謝您對市政的關心。", src: "〔來源：AI 擬寫，待確認〕" });
+    const formal = paras.map(p => p.t + p.src).join("\n\n");
+    const short = `您好，您反映的${a2.subject}，本府已請【待確認承辦單位】處理：${hasReply && r.per.length === 1 ? a2.reply.trim().slice(0, 80) : "【待承辦單位填寫：處理結果或目前進度】"}。如有問題請洽[承辦單位][電話]。`;
+    const english = a2.english ? `Dear [Title],\n\nThank you for contacting Hsinchu City Government [official English name to be confirmed] on ${a2.received ? ymd(a2.received) : "[date]"} regarding "${a2.subject}".\n\n${paraEn.join("\n\n")}\n\nIf you have further questions, please contact [unit] [officer] at [phone]. Thank you for your concern for our city.\n\n（中文對照版見正式版）` : "";
+    const phs = (formal + short).match(/【待[^】]*】/g) || [];
+    const pii = residual(formal + short + english);
+    const banned = ["儘速處理","依法辦理","非本府權責","並無此事"].filter(w => (formal + short).includes(w));
+    const notes = [];
+    if (r.urgent) notes.push("本案標記為危安／急迫，請主管加核");
+    if (a2.flags.protest.v === "是") notes.push("本案標記為陳抗，請主管加核");
+    if (r.per.some(p => p.cat.report)) notes.push("檢舉類：回覆不得透露陳情人身分或位置線索");
+    if (r.mode === "跨單位") notes.push("跨單位彙整（A5）：各段出處待各單位回覆，回覆到齊後比對矛盾");
+    r.review.forEach(x => notes.push("分案待確認：" + x));
+    rows.push({ id: r.id, mode: r.mode, formal, short, english, phs: phs.length, pii, banned, notes, urgent: r.urgent, a3: r, hasReply, conflicts: r.mode === "跨單位" ? "待各單位回覆後比對" : "無（單一單位）" });
+  }
+  return { rows };
+}
+function calendar(){
+  const mode = S.cfg.calMode;
+  const hol = new Set((S.cfg.holidays || "").split(/\s+/).map(s => s.trim()).filter(Boolean));
+  const isW = d => d.getDay() > 0 && d.getDay() < 6 && !hol.has(ymd(d));
+  return { mode, hol, isW, ok: mode !== "none" && (mode === "sim" || hol.size > 0) };
+}
+function addW(d, n, cal){ d = new Date(d.getFullYear(), d.getMonth(), d.getDate()); let guard = 0; while (n > 0 && guard++ < 400){ d.setDate(d.getDate() + 1); if (cal.isW(d)) n--; } return d; }
+function nwd(a, b, cal){ let n = 0; const d = new Date(a.getFullYear(), a.getMonth(), a.getDate()); const e = new Date(b.getFullYear(), b.getMonth(), b.getDate()); let g = 0; while (d <= e && g++ < 800){ if (cal.isW(d)) n++; d.setDate(d.getDate() + 1); } return n; }
+function runA6(a3){
+  const cal = calendar(); const asOf = new Date(S.cfg.asOf); const rows = [];
+  const R = rng(20261112);
+  for (const r of a3.rows){
+    const a2 = r.a2; const unit = r.per[0] ? r.per[0].cands[0] : { code: "----", name: "待人工分案" };
+    let rec = a2.received, closed = a2.closed, transfers = [unit.name], reasons = [], pause = 0, ext = "無", extD = 0, flagged = false;
+    if (S.cfg.simSla){
+      const start = new Date(asOf.getTime() - 16 * 864e5);
+      rec = new Date(start.getTime() + Math.floor(R() * (asOf - start - 3600e3)));
+      const alt = r.per[0] && r.per[0].cands[1];
+      const p = R();
+      if (alt && p < 0.3){ transfers = [unit.name, alt.name, unit.name]; reasons = [`模擬：${unit.name}認為非本單位權責，轉${alt.name}`, `模擬：${alt.name}退回，認為應由${unit.name}辦理`]; }
+      else if (p < 0.12){ transfers = ["行政處文書科", unit.name]; reasons = ["模擬：初分至文書科，再依職掌轉派"]; }
+      pause = R() < 0.04 ? 2 : 0;
+      const e = R(); ext = e < 0.05 ? "核准" : e < 0.09 ? "申請中" : "無"; extD = ext === "核准" ? 3 : 0;
+      flagged = R() < 0.03; closed = null;
+    }
+    const role = { H: `H-${unit.code}-${String(1 + Math.floor(R() * 3)).padStart(2, "0")}`, C: `C-${unit.code}`, S: `S-${unit.code}` };
+    if (!rec || !cal.ok){ rows.push({ id: r.id, unit: unit.name, code: unit.code, st: "無法判定", why: !rec ? "缺收文時間（A1 白名單未送出或欄位未對應）" : "未提供工作日曆", role, transfers, reasons, urgent: r.urgent, summary: a2.summary }); continue; }
+    let eff = new Date(rec.getFullYear(), rec.getMonth(), rec.getDate());
+    if (!cal.isW(eff) || rec.getHours() * 60 + rec.getMinutes() > 17 * 60 + 30) eff = addW(eff, 1, cal);
+    const due = addW(eff, 3 + pause + extD, cal);
+    const dueDt = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 17, 30);
+    if (S.cfg.simSla){
+      if (dueDt < asOf){ if (R() < 0.85){ const c = addW(eff, [1,2,3,3,3,4,5][Math.floor(R() * 7)], cal); closed = new Date(c.getFullYear(), c.getMonth(), c.getDate(), 9 + Math.floor(R() * 8), [0,15,30,45][Math.floor(R() * 4)]); } }
+      else if (R() < 0.45){ const c = addW(eff, R() < 0.5 ? 1 : 2, cal); const cd = new Date(c.getFullYear(), c.getMonth(), c.getDate(), 9 + Math.floor(R() * 7), 0); if (cd < asOf) closed = cd; }
+      if (closed && closed > asOf) closed = null;
+    }
+    let st, od = 0;
+    if (closed){ st = closed > dueDt ? "逾期結案" : "期限內結案"; if (st === "逾期結案") od = nwd(due, closed, cal) - 1; }
+    else { st = asOf > dueDt ? "逾期未結" : (ymd(asOf) === ymd(due) ? "今日到期" : "處理中"); if (st === "逾期未結") od = nwd(due, asOf, cal) - 1; }
+    const left = st === "處理中" ? nwd(asOf, due, cal) - 1 : 0;
+    rows.push({ id: r.id, unit: unit.name, code: unit.code, rec, due, dueDt, closed, st, od, left, pause, ext, extD, transfers, reasons, flagged, role, urgent: r.urgent, summary: a2.summary });
+  }
+  const today = rows.filter(x => x.st === "今日到期");
+  const sup = {}; today.forEach(x => { const k = x.role.S + "|" + x.unit; (sup[k] = sup[k] || []).push(x.id); });
+  const overdue = rows.filter(x => x.st === "逾期未結" || x.st === "逾期結案").sort((a, b) => b.od - a.od);
+  const watch = rows.map(x => { const rs = []; if (x.st === "今日到期") rs.push("今日到期"); if (x.st === "逾期未結") rs.push("逾期未結"); if (x.ext === "申請中" && !x.closed) rs.push("展延申請中"); if (x.flagged && !x.closed) rs.push("管考指定列管"); return rs.length ? Object.assign({ reasonsW: rs.join("、") }, x) : null; }).filter(Boolean);
+  const repeatT = rows.filter(x => x.transfers.length - 1 >= 2);
+  return { rows, today, sup, overdue, watch, repeatT, cal, asOf };
+}
+function runA7(res){
+  const a6 = res.a6.rows, a2 = res.a2.rows, a3 = res.a3.rows, a4 = res.a4.rows;
+  const due = a6.filter(x => ["期限內結案","逾期結案","逾期未結"].includes(x.st));
+  const ontime = a6.filter(x => x.st === "期限內結案").length;
+  const odd = a6.filter(x => x.od > 0);
+  const byUnit = {};
+  a6.forEach(x => { if (!["期限內結案","逾期結案","逾期未結"].includes(x.st)) return; const u = byUnit[x.unit] = byUnit[x.unit] || { n: 0, ok: 0 }; u.n++; if (x.st === "期限內結案") u.ok++; });
+  const m = {
+    sla: due.length ? ontime / due.length : null, dueN: due.length, ontime, avgOd: odd.length ? odd.reduce((a, b) => a + b.od, 0) / odd.length : 0,
+    undetermined: a6.filter(x => x.st === "無法判定").length, review: a3.filter(x => x.review.length).length,
+    pending: a2.filter(x => x.locResult === "待定位").length, unsure: a2.filter(x => x.flags.danger && x.flags.danger.v === "不確定").length,
+    phs: a4.reduce((a, b) => a + b.phs, 0), noCat: a3.filter(x => x.mode === "資訊不足").length, cross: a3.filter(x => x.mode === "跨單位").length,
+    noise: a3.filter(x => x.per.some(p => p.cat.id === "noise")).length, repeatT: res.a6.repeatT.length, manualA1: res.a1.manual,
+  };
+  const sug = []; let n = 0; const id = () => `Q-${ymd(new Date(S.cfg.asOf)).slice(0, 7)}-${String(++n).padStart(2, "0")}`;
+  if (!S.cfg.wlTime || m.undetermined) sug.push({ id: id(), type: "資料", ev: `A6 有 ${m.undetermined} 件無法判定；A4 草稿陳情日期需留空`, prop: "A1 白名單加入立案時間與結案時間（非個資）", risk: "低", val: "核定後重跑 A1→A6，確認期限可計算", who: "機關" });
+  if (m.pending > a2.length * 0.5) sug.push({ id: id(), type: "資料", ev: `A2 有 ${m.pending} 件地點待定位`, prop: S.cfg.wlLoc ? "提供地理圖資與設施權責對照表，讓路段可對應到行政區與里" : "A1 白名單加入遮罩後地點（保留到路段），並提供地理圖資", risk: "路段加罕見特徵可能形成間接識別，需保留風險提示", val: "抽樣 50 件檢查定位正確率與可識別性", who: "機關" });
+  if (m.noise) sug.push({ id: id(), type: "規則", ev: `${m.noise} 件噪音案件無法決定主辦單位；分案規則只有工廠噪音（P098）`, prop: "在業務分工規則補「住戶生活噪音」的主辦單位與條件", risk: "無", val: "以 tiered-routing-rule-check 模式 A 檢查規則一致性後重跑 A3", who: "機關／管考單位" });
+  if (m.repeatT) sug.push({ id: id(), type: "規則", ev: `${m.repeatT} 件重複轉派，集中在條件式候選的單位之間`, prop: "把條件式第 2 順位的判斷條件（噪音來源、水溝類型等）納入 A2 擷取欄位，分案時先判斷", risk: "A2 擷取錯誤會造成誤分", val: "以歷史案件模擬轉派次數變化", who: "管考單位與廠商" });
+  if (m.unsure) sug.push({ id: id(), type: "提示詞", ev: `${m.unsure} 件危安標為「不確定」`, prop: "A2 危安判斷補明確條件：異味提到瓦斯、化學品、頭暈標「是」；水溝提到已淹水標「是」", risk: "可能漏標；危安以召回率優先", val: "與管考人工標記比對召回率", who: "管考單位與廠商" });
+  if (m.phs) sug.push({ id: id(), type: "資料", ev: `A4 草稿共有 ${m.phs} 處待填寫；知識庫沒有核定範本`, prop: "為常見訴求各匯入 1 份核定回覆範本，並建立法規版本表", risk: "範本未定期更新會引用過時內容", val: "匯入後重跑 A4，承辦人抽核 10 件", who: "管考單位與承辦單位" });
+  if (m.noCat) sug.push({ id: id(), type: "規則", ev: `${m.noCat} 件沒有對應的訴求類別`, prop: "檢視這些案件的主旨，擴充分類關鍵字或補分工規則", risk: "低", val: "補充後重跑 A2、A3", who: "管考單位" });
+  return { m, byUnit, sug };
+}
+async function runAll(){
+  if (!S.raw.length){ toast("請先載入案件資料"); return; }
+  const btn = $("#btnRun"); btn.disabled = true;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const wait = ms => new Promise(r => setTimeout(r, reduce ? 0 : ms));
+  STAGES.forEach(s => S.states[s.id] = "idle"); renderRail();
+  const res = {};
+  const steps = [["a1", () => res.a1 = runA1()], ["a2", () => res.a2 = runA2(res.a1)], ["a3", () => res.a3 = runA3(res.a2)], ["a4", () => res.a4 = runA4(res.a3)], ["a6", () => res.a6 = runA6(res.a3)], ["a7", () => res.a7 = runA7(res)]];
+  for (const [id, fn] of steps){
+    S.states[id] = "run"; renderRail(); await wait(260);
+    try { fn(); } catch (e){ console.error(e); S.states[id] = "block"; renderRail(); toast(`${id.toUpperCase()} 執行失敗：${e.message}`); btn.disabled = false; return; }
+    S.res = res; S.states[id] = stageState(id, res); renderRail();
+    if (S.sel === id) renderStage();
+  }
+  S.res = res; S.ranAt = new Date(); renderRail(); renderStage(); btn.disabled = false;
+  toast(`完成：${res.a1.rows.length} 件跑完 6 個階段`);
+}
+function stageState(id, res){
+  if (id === "a1") return res.a1.manual ? "warn" : "done";
+  if (id === "a2") return res.a2.rows.some(r => r.status !== "完成") ? "warn" : "done";
+  if (id === "a3") return res.a3.rows.some(r => r.review.length) ? "warn" : "done";
+  if (id === "a4") return "warn";
+  if (id === "a6") return res.a6.rows.some(r => r.st === "無法判定" || r.st === "逾期未結") ? "warn" : "done";
+  return "done";
+}
+function counts(id){
+  const r = S.res; if (!r) return null;
+  const n = { a1: r.a1 && [S.raw.length, r.a1.rows.filter(x => x.status === "完成").length], a2: r.a2 && [r.a2.rows.length, r.a2.rows.filter(x => x.status === "完成").length],
+    a3: r.a3 && [r.a3.rows.length, r.a3.rows.filter(x => !x.review.length).length], a4: r.a4 && [r.a4.rows.length, r.a4.rows.length],
+    a6: r.a6 && [r.a6.rows.length, r.a6.rows.filter(x => x.st !== "無法判定").length], a7: r.a7 && [r.a7.sug.length, null] };
+  return n[id];
+}
+const OUTLBL = { a1: "通過", a2: "完成", a3: "免人工", a4: "草稿", a6: "可計算", a7: "建議" };
+
+/* ========= 畫面 ========= */
+function renderRail(){
+  $("#rail").innerHTML = STAGES.map(s => {
+    const c = counts(s.id); const st = S.states[s.id] || (S.res && S.res[s.id] ? stageState(s.id, S.res) : "idle");
+    const flow = !c ? `<span>待執行</span>` : s.id === "a7" ? `<b>${c[0]}</b><span>項建議草案</span>` : `<b>${c[1]}</b><span>/ ${c[0]} ${OUTLBL[s.id]}</span>`;
+    return `<button class="station" role="tab" type="button" data-id="${s.id}" data-state="${st}" aria-selected="${S.sel === s.id}">
+      <span class="code"><span>${s.code}</span><span class="dot" aria-hidden="true"></span></span>
+      <span class="name">${s.name}</span><span class="skill">${s.skill}</span>
+      <span class="flow">${flow}</span><span class="bar"><i></i></span></button>`;
+  }).join("");
+}
+function kpi(v, k, cls = ""){ return `<div class="kpi ${cls}"><span class="v">${v}</span><span class="k">${k}</span></div>`; }
+function gate(chip, cls, text){ return `<div class="gate"><span class="chip ${cls}">${chip}</span><span>${text}</span></div>`; }
+function hl(t){ return esc(t).replace(/\[([^\]]+?\d+)\]/g, '<span class="tok">[$1]</span>').replace(/【([^】]*)】/g, '<span class="ph">【$1】</span>').replace(/〔([^〕]*)〕/g, '<span class="src">〔$1〕</span>'); }
+function stamps(r){
+  const a = [];
+  const f = r && r.flags; if (!f) return "";
+  if (f.danger && f.danger.v === "是") a.push('<span class="stamp red">危安</span>');
+  else if (f.urgent && f.urgent.v === "是") a.push('<span class="stamp red">急迫</span>');
+  if (f.danger && f.danger.v === "不確定") a.push('<span class="stamp amber">待判</span>');
+  if (f.protest && f.protest.v === "是") a.push('<span class="stamp red">陳抗</span>');
+  if (f.repeat && f.repeat.v === "是") a.push('<span class="stamp blue">重複</span>');
+  if (r.multi) a.push('<span class="stamp blue">多訴求</span>');
+  return a.join(" ");
+}
+function table(id, cols, rows, opts = {}){
+  const q = (S.q[id] || "").trim().toLowerCase(); const f = S.filter[id] || "all";
+  let list = rows;
+  if (opts.filters && f !== "all") list = list.filter(opts.filters.find(x => x[0] === f)[2]);
+  if (q) list = list.filter(r => JSON.stringify(opts.text ? opts.text(r) : r).toLowerCase().includes(q));
+  const lim = 150; const shown = list.slice(0, lim);
+  const fl = opts.filters ? `<div class="filters" role="group" aria-label="篩選">${opts.filters.map(([k, l, fn]) => `<button type="button" data-f="${k}" aria-pressed="${f === k}">${l} <span class="mono">${rows.filter(fn).length}</span></button>`).join("")}</div>` : "";
+  return `<div class="toolbar"><label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" id="q-${id}" placeholder="搜尋案號或內容" value="${esc(S.q[id] || "")}" aria-label="搜尋"></label>${fl}</div>
+  <div class="tablebox"><table><thead><tr>${cols.map(c => `<th${c.num ? ' style="text-align:right"' : ""}>${c.h}</th>`).join("")}</tr></thead><tbody>
+  ${shown.map(r => `<tr data-case="${esc(r.id)}" class="${opts.urg && opts.urg(r) ? "urg" : ""}" tabindex="0">${cols.map(c => `<td class="${c.num ? "num" : ""}">${c.f(r)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${cols.length}" class="more">沒有符合條件的案件</td></tr>`}
+  </tbody></table></div>${list.length > lim ? `<div class="more">顯示前 ${lim} 筆，共 ${list.length} 筆；請用搜尋縮小範圍</div>` : ""}`;
+}
+function head(s, extra = ""){
+  return `<div class="stage-head"><div style="min-width:0;flex:1 1 320px"><div class="eyebrow">${s.code} · ${s.skill}</div><h2>${s.name}</h2><p>${s.desc}</p></div>
+    <div class="io"><div><span>輸入</span><b>${s.inp}</b></div><div><span>輸出</span><b>${s.out}</b></div>${extra}</div></div>`;
+}
+function renderStage(){
+  const s = STAGES.find(x => x.id === S.sel) || STAGES[0];
+  const el = $("#stage");
+  if (!S.res || !S.res[s.id]){
+    el.innerHTML = head(s) + `<div class="empty"><h3>尚未執行</h3><p>已載入 ${S.raw.length} 件案件。按下「執行全流程」，六個階段會依序處理，並在這裡顯示結果。</p><button class="btn primary" type="button" data-act="run">執行全流程</button></div>`;
+    return;
+  }
+  el.innerHTML = VIEWS[s.id](s, S.res);
+}
+const VIEWS = {
+  a1(s, R){
+    const a = R.a1; const tot = Object.values(a.stats).reduce((x, y) => x + y, 0);
+    const k = kpi(a.rows.length, "處理件數") + kpi(a.rows.length - a.manual, "完成", "ok") + kpi(a.manual, "需人工去識別化", a.manual ? "bad" : "") + kpi(tot, "遮罩筆數") + kpi(a.risk.length, "風險提示", a.risk.length ? "warn" : "");
+    const cats = ["姓名","電話","Email","門牌","身分證號","關係","車牌"].map(c => `${c} ${a.stats[c] || 0}`).join("、");
+    const g = gate("白名單", "info", `送出：案號、主旨、遮罩後內容${S.cfg.wlTime ? "、立案／結案時間" : ""}${S.cfg.wlSource ? "、來源" : ""}${S.cfg.wlLoc ? "、遮罩後地點" : ""}`) +
+      gate("移除", "", `整欄不送出：${a.removed.length ? esc(a.removed.join("、")) : "無"}`) +
+      gate("遮罩", tot ? "ok" : "", `${cats}；二次掃描補遮 ${a.rescan} 筆`) +
+      gate("對照表", "", `代碼與原文的對照只保存在這個分頁的記憶體，不會匯出`) +
+      (S.isSample ? gate("模擬資料", "sim", "範例資料為模擬資料（測試路、示範案件），依規定可在雲端處理；真實案件必須在機關地端執行") : "");
+    return head(s) + `<div class="kpis">${k}</div><div class="gates">${g}</div>` + table("a1", [
+      { h: "案號", f: r => `<span class="caseid">${esc(r.id)}</span>` },
+      { h: "主旨（遮罩後）", f: r => hl(r.subject) },
+      { h: "遮罩後內容", f: r => `<span class="clip">${hl(r.content)}</span>` },
+      { h: "遮罩", num: true, f: r => r.tokens.length },
+      { h: "狀態", f: r => r.status === "完成" ? `<span class="chip ok">完成</span>` : `<span class="chip bad">${esc(r.status)}</span>` },
+      { h: "風險提示", f: r => r.hint ? `<span class="chip warn" title="${esc(r.hint)}">有</span>` : "" },
+    ], a.rows, { filters: [["all", "全部", () => true], ["masked", "有遮罩", r => r.tokens.length > 0], ["risk", "風險提示", r => !!r.hint], ["manual", "需人工", r => r.status !== "完成"]], text: r => [r.id, r.subject, r.content] });
+  },
+  a2(s, R){
+    const a = R.a2.rows; const ok = a.filter(r => r.status === "完成");
+    const dz = ok.filter(r => r.flags.danger.v === "是").length, un = ok.filter(r => r.flags.danger.v === "不確定").length;
+    const k = kpi(a.length, "輸入件數") + kpi(dz, "危安／急迫", dz ? "bad" : "") + kpi(un, "危安待判", un ? "warn" : "") + kpi(ok.filter(r => r.multi).length, "多項訴求") + kpi(ok.filter(r => r.flags.repeat.v === "是").length, "重複陳情") + kpi(ok.filter(r => r.locResult === "待定位").length, "地點待定位");
+    const g = gate("閘門", a.some(r => r.status !== "完成") ? "bad" : "ok", `以 A1 規則重新掃描主旨與內容；殘留個資的案件標「需退回去識別化」，不進 A3（本次 ${a.filter(r => r.status !== "完成").length} 件）`) +
+      gate("缺參考資料", "warn", "地理圖資、設施權責對照表、近期案件索引未提供：地點只到路段、重複陳情只比對同批次與內容用語") +
+      gate("急迫通知", dz ? "bad" : "", `${dz} 件產出管考通知草稿（在案件履歷中），只產出內容，不發送`);
+    return head(s) + `<div class="kpis">${k}</div><div class="gates">${g}</div>` + table("a2", [
+      { h: "案號", f: r => `<span class="caseid">${esc(r.id)}</span>` },
+      { h: "摘要", f: r => `<span class="clip">${esc(r.summary || r.why)}</span>` },
+      { h: "訴求", f: r => (r.demands || []).map(d => `<span class="chip">${esc(d.cat.name)}</span>`).join(" ") || `<span class="chip warn">未分類</span>` },
+      { h: "地點", f: r => esc(r.loc || "") },
+      { h: "標記", f: r => r.status === "完成" ? stamps(r) : `<span class="chip bad">需退回</span>` },
+    ], a, { urg: r => r.flags && r.flags.danger && r.flags.danger.v === "是", filters: [["all", "全部", () => true], ["d", "危安", r => r.flags && r.flags.danger && r.flags.danger.v === "是"], ["u", "待判", r => r.flags && r.flags.danger && r.flags.danger.v === "不確定"], ["m", "多項訴求", r => r.multi], ["p", "陳抗", r => r.flags && r.flags.protest && r.flags.protest.v === "是"], ["x", "需退回", r => r.status !== "完成"]], text: r => [r.id, r.summary, r.loc] });
+  },
+  a3(s, R){
+    const a = R.a3.rows;
+    const byU = {}; a.forEach(r => r.units.forEach(u => byU[u] = (byU[u] || 0) + 1));
+    const k = kpi(a.length, "分案件數") + kpi(a.filter(r => r.mode === "單一權責").length, "單一權責", "ok") + kpi(a.filter(r => r.mode === "跨單位").length, "跨單位") + kpi(a.filter(r => r.mode === "資訊不足").length, "資訊不足", "warn") + kpi(a.filter(r => r.review.length).length, "需人工確認", "warn");
+    const top = Object.entries(byU).sort((x, y) => y[1] - x[1]);
+    const max = top.length ? top[0][1] : 1;
+    const g = gate("規則版本", "info", RULE_VER) + gate("分數", "", "沒有已校準的分數來源，一律只給順位與依據；第 2 順位是條件式候選，不是機率排序") + gate("不派送", "", "本階段只產生建議，不派送、不改分；是否自動派送由分級處置閘門決定");
+    const bars = `<div class="unitbars" aria-label="各單位分案件數">${top.map(([c, n]) => `<div class="ub"><span>${esc(U[c])}</span><span class="t"><i style="width:${(n / max * 100).toFixed(1)}%"></i></span><span>${n}</span></div>`).join("")}</div>`;
+    return head(s, `<div><span>規則</span><b>V3.7.2</b></div>`) + `<div class="kpis">${k}</div><div class="gates">${g}</div>${bars}` + table("a3", [
+      { h: "案號", f: r => `<span class="caseid">${esc(r.id)}</span>` },
+      { h: "判斷", f: r => `<span class="chip ${r.mode === "單一權責" ? "ok" : r.mode === "跨單位" ? "info" : "warn"}">${r.mode}</span>` },
+      { h: "第 1 順位", f: r => r.per.map(p => `${esc(p.cands[0].name)} <span class="mono src">${p.cands[0].code}</span>`).join("<br>") || "—" },
+      { h: "依據", f: r => `<span class="clip">${r.per.map(p => esc(p.cands[0].ev)).join("；")}</span>` },
+      { h: "條件式候選", f: r => r.per.flatMap(p => p.cands.slice(1)).map(c => `<span class="chip" title="${esc(c.cond)}">${esc(c.name)}</span>`).join(" ") },
+      { h: "人工確認", f: r => r.review.length ? `<span class="chip warn" title="${esc(r.review.join("；"))}">需確認</span>` : "" },
+    ], a, { urg: r => r.urgent, filters: [["all", "全部", () => true], ["s", "單一", r => r.mode === "單一權責"], ["c", "跨單位", r => r.mode === "跨單位"], ["r", "需確認", r => r.review.length > 0], ["n", "資訊不足", r => r.mode === "資訊不足"]], text: r => [r.id, r.per.map(p => p.cands[0].name)] });
+  },
+  a4(s, R){
+    const a = R.a4.rows; const phs = a.reduce((x, y) => x + y.phs, 0);
+    const k = kpi(a.length, "草稿件數") + kpi(a.filter(r => r.mode === "跨單位").length, "跨單位彙整（A5）") + kpi(a.filter(r => r.english).length, "英文版") + kpi(phs, "待填寫占位", "warn") + kpi(a.filter(r => r.pii.length).length, "自檢個資", a.some(r => r.pii.length) ? "bad" : "ok") + kpi(a.filter(r => r.hasReply).length, "已帶入單位說明");
+    const g = gate("草稿", "bad", "所有草稿都是「未經人工核定，不得對外發送」；本工具不發送任何回覆") +
+      gate("處理結果", "warn", S.map.reply ? "已對應「承辦單位處理說明」欄位：有內容的案件會帶入並標來源" : "沒有承辦單位處理說明欄位，實質結果一律留「待承辦單位填寫」，不代替單位寫承諾") +
+      gate("知識庫", "", "未提供核定範本、法規版本表與相似案例：標「無適用範本」，不引用法規");
+    return head(s) + `<div class="kpis">${k}</div><div class="gates">${g}</div>` + table("a4", [
+      { h: "案號", f: r => `<span class="caseid">${esc(r.id)}</span>` },
+      { h: "類型", f: r => `<span class="chip ${r.mode === "跨單位" ? "info" : ""}">${r.mode === "跨單位" ? "A5 彙整" : "A4 單一"}</span>${r.english ? ' <span class="chip">EN</span>' : ""}` },
+      { h: "精簡版", f: r => `<span class="clip">${hl(r.short)}</span>` },
+      { h: "占位", num: true, f: r => r.phs },
+      { h: "核稿注意", f: r => r.notes.length ? `<span class="clip">${esc(r.notes.join("；"))}</span>` : "" },
+    ], a, { urg: r => r.urgent, filters: [["all", "全部", () => true], ["c", "跨單位", r => r.mode === "跨單位"], ["e", "英文", r => !!r.english], ["u", "主管加核", r => r.urgent], ["h", "已帶入說明", r => r.hasReply]], text: r => [r.id, r.short] });
+  },
+  a6(s, R){
+    const a = R.a6; const c = a.cal;
+    const cnt = st => a.rows.filter(x => x.st === st).length;
+    const due = cnt("期限內結案") + cnt("逾期結案") + cnt("逾期未結");
+    const rate = due ? (cnt("期限內結案") / due * 100).toFixed(1) + "%" : "—";
+    const k = kpi(a.today.length, "今日到期提醒", a.today.length ? "warn" : "") + kpi(a.overdue.length, "逾期清單", a.overdue.length ? "bad" : "") + kpi(a.watch.length, "列管清單") + kpi(a.repeatT.length, "重複轉派") + kpi(rate, "SLA 達成率") + kpi(cnt("無法判定"), "無法判定", cnt("無法判定") ? "warn" : "");
+    const calTxt = c.mode === "agency" ? `機關日曆（非工作日 ${c.hol.size} 天）` : c.mode === "sim" ? `模擬日曆：週一至週五，另扣除 ${c.hol.size} 天` : "未提供";
+    const g = gate("日曆", c.mode === "sim" ? "sim" : c.ok ? "ok" : "bad", calTxt + (c.ok ? "" : "；依規定不推算工作天，全部標無法判定")) +
+      gate("口徑", "", "收文次一工作天起算第 3 個工作天 17:30；17:30 後或非工作天收文視為次一工作天；轉派不重新起算（待機關決定）") +
+      gate("截止", "", `資料截止 ${ymdhm(a.asOf)}${S.cfg.simSla ? "；收文、結案、轉派、展延為模擬資料" : ""}`) +
+      gate("提醒", "", `今日到期 ${a.today.length} 件，主管彙整 ${Object.keys(a.sup).length} 則；只產出草稿，未經確認不發送`);
+    const supHtml = Object.keys(a.sup).length ? `<div class="sugg">${Object.entries(a.sup).map(([k, ids]) => { const [sv, u] = k.split("|"); return `<div class="sug"><div class="sug-h"><span class="stamp amber">今日到期</span><b>${esc(sv)}</b><span>${esc(u)}</span><span class="chip">${ids.length} 件</span></div><p class="mono" style="font-size:12px">${ids.map(esc).join("、")}</p><p class="ev">【SLA 到期提醒】${esc(u)}今日 17:30 到期未結案件 ${ids.length} 件，請督導承辦人於期限前結案或依程序申請展延。</p></div>`; }).join("")}</div>` : "";
+    return head(s) + `<div class="kpis">${k}</div><div class="gates">${g}</div>${supHtml}` + table("a6", [
+      { h: "案號", f: r => `<span class="caseid">${esc(r.id)}</span>` },
+      { h: "承辦單位", f: r => esc(r.unit) },
+      { h: "收文", f: r => `<span class="mono">${r.rec ? ymdhm(r.rec) : "—"}</span>` },
+      { h: "期限", f: r => `<span class="mono">${r.due ? ymd(r.due) : "—"}</span>` },
+      { h: "狀態", f: r => `<span class="chip ${({"期限內結案":"ok","逾期結案":"warn","逾期未結":"bad","今日到期":"warn","處理中":"info","無法判定":""})[r.st]}">${r.st}</span>` },
+      { h: "逾期天", num: true, f: r => r.od || "" },
+      { h: "轉派", f: r => r.transfers.length > 1 ? `<span class="clip">${esc(r.transfers.join(" → "))}</span>` : "" },
+    ], a.rows, { urg: r => r.st === "逾期未結" || r.st === "今日到期", filters: [["all", "全部", () => true], ["t", "今日到期", r => r.st === "今日到期"], ["o", "逾期", r => r.st === "逾期未結" || r.st === "逾期結案"], ["w", "列管", r => a.watch.some(w => w.id === r.id)], ["r", "重複轉派", r => r.transfers.length > 2], ["n", "無法判定", r => r.st === "無法判定"]], text: r => [r.id, r.unit, r.st] });
+  },
+  a7(s, R){
+    const a = R.a7; const m = a.m;
+    const k = kpi(m.sla == null ? "—" : (m.sla * 100).toFixed(1) + "%", "SLA 達成率", m.sla != null && m.sla < 0.8 ? "warn" : "ok") + kpi(m.avgOd.toFixed(1), "平均逾期工作天") + kpi(m.review, "分案需人工確認", "warn") + kpi(m.unsure, "危安待判") + kpi(m.phs, "草稿待填寫") + kpi(a.sug.length, "調整建議草案");
+    const units = Object.entries(a.byUnit).sort((x, y) => y[1].n - x[1].n);
+    const bars = units.length ? `<div class="panel-h" style="border-top:1px solid var(--line)"><h3>各單位 SLA 達成率</h3><span class="note">期限內結案／應結案件；少於 30 件的單位加註樣本過少</span></div><div class="unitbars">${units.map(([u, v]) => `<div class="ub"><span>${esc(u)}${v.n < 30 ? ' <span class="chip">樣本少</span>' : ""}</span><span class="t"><i class="${v.ok / v.n < 0.8 ? "low" : ""}" style="width:${(v.ok / v.n * 100).toFixed(1)}%"></i></span><span>${(v.ok / v.n * 100).toFixed(0)}% <span class="src">${v.ok}/${v.n}</span></span></div>`).join("")}</div>` : "";
+    const g = gate("資料限制", "warn", "沒有退改分紀錄與錯誤回報：退改分率、AI 一致率無法判定；建議改由 A1–A6 的流程訊號產生") + gate("核可", "", "所有建議都是「草案，待核可」；本工具不修改規則或提示詞");
+    const sug = `<div class="panel-h" style="border-top:1px solid var(--line)"><h3>調整建議（草案，待核可）</h3></div><div class="sugg">${a.sug.map(x => `<div class="sug"><div class="sug-h"><b>${x.id}</b><span class="chip info">${x.type}</span><span class="stamp amber">草案</span><span class="note" style="margin-left:auto">核可：${esc(x.who)}</span></div><p class="ev">${esc(x.ev)}</p><p><strong>建議：</strong>${esc(x.prop)}</p><p class="note">風險：${esc(x.risk)}｜驗證：${esc(x.val)}</p></div>`).join("") || '<p class="note">本次沒有需要調整的項目</p>'}</div>`;
+    return head(s) + `<div class="kpis">${k}</div><div class="gates">${g}</div>${bars}${sug}`;
+  },
+};
+
+/* ========= 案件履歷 ========= */
+function openCase(id){
+  const R = S.res; if (!R) return;
+  const a1 = R.a1.rows.find(x => x.id === id), a2 = R.a2.rows.find(x => x.id === id), a3 = R.a3.rows.find(x => x.id === id), a4 = R.a4.rows.find(x => x.id === id), a6 = R.a6.rows.find(x => x.id === id);
+  $("#drTitle").textContent = id; $("#drStamps").innerHTML = a2 ? stamps(a2) : "";
+  const steps = [];
+  if (a1) steps.push(["A1", "去識別化", `<div class="box">${hl(a1.subject)}\n\n${hl(a1.content)}</div><dl class="kv" style="margin-top:8px"><dt>狀態</dt><dd>${esc(a1.status)} ${esc(a1.why)}</dd><dt>遮罩代碼</dt><dd>${a1.tokens.map(t => `<span class="tok">${esc(t.token)}</span>`).join(" ") || "無"}</dd>${a1.location ? `<dt>遮罩後地點</dt><dd>${hl(a1.location)}</dd>` : ""}${a1.hint ? `<dt>風險提示</dt><dd>${esc(a1.hint)}</dd>` : ""}</dl>`]);
+  if (a2 && a2.status === "完成"){
+    const f = a2.flags; const fl = (n, x) => `<dt>${n}</dt><dd>${x.v}${x.why ? `：${esc(x.why)}` : ""}${x.conf ? `（信心${x.conf}）` : ""}${x.sim && x.sim.length ? `；相似案號 ${x.sim.map(esc).join("、")}` : ""}</dd>`;
+    const notice = f.urgent.v === "是" ? `<div class="box" style="margin-top:8px">【急迫案件通知】案號：${esc(id)}\n標記：危安／急迫（理由：${esc(f.danger.why || f.urgent.why)}）\n摘要：${esc(a2.summary)}\n地點：${esc(a2.loc)}（${a2.locResult}）\n建議：請優先分案並確認處理時限</div>` : "";
+    steps.push(["A2", "案件理解", `<p style="margin:0 0 8px">${esc(a2.summary)}</p><div class="cands">${a2.demands.map((d, i) => `<div class="cand"><span class="r">${i + 1}</span><span>${esc(d.text)}<small>類別：${esc(d.cat.name)}｜地點：${esc(d.loc)}｜期望：${esc(d.expect)}</small></span></div>`).join("")}</div><dl class="kv" style="margin-top:8px">${fl("危安", f.danger)}${fl("急迫", f.urgent)}${fl("陳抗", f.protest)}${fl("重複陳情", f.repeat)}<dt>定位</dt><dd>${a2.locResult}（未提供地理圖資，不推測里別）</dd></dl>${notice}`]);
+  } else if (a2) steps.push(["A2", "案件理解", `<div class="box">${esc(a2.status)}：${esc(a2.why)}</div>`]);
+  if (a3) steps.push(["A3", "分案建議", `<p style="margin:0 0 8px"><span class="chip ${a3.mode === "跨單位" ? "info" : a3.mode === "資訊不足" ? "warn" : "ok"}">${a3.mode}</span></p>${a3.per.map(p => `<div class="lbl" style="margin:6px 0 4px">${esc(p.demand)}</div><div class="cands">${p.cands.map(c => `<div class="cand"><span class="r">${c.rank}</span><span>${esc(c.name)} <span class="mono src">${c.code}</span><small>${esc(c.why)}</small><small>依據：${esc(c.ev)}${c.cond ? `｜條件：${esc(c.cond)}` : ""}${c.ex ? `｜已排除：${esc(c.ex)}` : ""}</small></span></div>`).join("")}</div>`).join("")}${a3.review.length ? `<div class="box" style="margin-top:8px">需人工確認：${esc(a3.review.join("；"))}</div>` : ""}`]);
+  if (a4) steps.push([a4.mode === "跨單位" ? "A5" : "A4", a4.mode === "跨單位" ? "跨單位彙整" : "回覆擬稿", `<div class="tabs" role="tablist"><button type="button" role="tab" data-dt="f" aria-selected="true">正式版</button><button type="button" role="tab" data-dt="s" aria-selected="false">精簡版</button>${a4.english ? '<button type="button" role="tab" data-dt="e" aria-selected="false">English</button>' : ""}</div>
+    <div class="draft"><span class="wm stamp red">草稿</span><div class="box" id="dtxt" data-f="${esc(a4.formal)}" data-s="${esc(a4.short)}" data-e="${esc(a4.english)}">${hl(a4.formal)}</div></div>
+    <button class="btn copy" type="button" data-act="copy">複製目前版本</button>
+    <dl class="kv" style="margin-top:8px"><dt>待填寫</dt><dd>${a4.phs} 處</dd><dt>自檢個資</dt><dd>${a4.pii.length ? esc(a4.pii.join("、")) : "未發現"}</dd><dt>矛盾清單</dt><dd>${esc(a4.conflicts)}</dd>${a4.notes.length ? `<dt>核稿注意</dt><dd>${esc(a4.notes.join("；"))}</dd>` : ""}</dl>`]);
+  if (a6) steps.push(["A6", "SLA 追蹤", `<dl class="kv"><dt>狀態</dt><dd><span class="chip">${a6.st}</span> ${a6.why ? esc(a6.why) : ""}</dd>${a6.rec ? `<dt>收文</dt><dd class="mono">${ymdhm(a6.rec)}</dd><dt>期限</dt><dd class="mono">${ymd(a6.due)} 17:30</dd>` : ""}${a6.closed ? `<dt>結案</dt><dd class="mono">${ymdhm(a6.closed)}</dd>` : ""}${a6.od ? `<dt>逾期</dt><dd>${a6.od} 個工作天</dd>` : ""}${a6.left ? `<dt>剩餘</dt><dd>${a6.left} 個工作天</dd>` : ""}<dt>展延／暫停</dt><dd>${esc(a6.ext || "無")}${a6.pause ? `；暫停 ${a6.pause} 工作天` : ""}</dd><dt>轉派路徑</dt><dd>${esc(a6.transfers.join(" → "))}</dd>${a6.reasons.length ? `<dt>轉派理由</dt><dd>${esc(a6.reasons.join("；"))}</dd>` : ""}<dt>承辦／窗口／主管</dt><dd class="mono">${a6.role.H}／${a6.role.C}／${a6.role.S}</dd></dl>`]);
+  $("#drBody").innerHTML = steps.map(([n, t, b]) => `<section class="step"><span class="n">${n}</span><div style="min-width:0"><h4>${t}</h4>${b}</div></section>`).join("");
+  $("#drawer").classList.add("on"); $("#scrim").classList.add("on"); $("#drawer").setAttribute("aria-hidden", "false"); $("#drClose").focus();
+}
+function closeCase(){ $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); $("#drawer").setAttribute("aria-hidden", "true"); }
+
+/* ========= 資料載入 ========= */
+function setData(rows, label, isSample){
+  S.raw = rows.filter(r => Object.values(r).some(v => String(v ?? "").trim() !== ""));
+  S.cols = [...new Set(S.raw.flatMap(r => Object.keys(r)))];
+  S.map = autoMap(S.cols); S.dataLabel = label; S.isSample = isSample; S.res = null; S.states = {};
+  $("#dataChip").textContent = label; $("#dataChip").className = "chip " + (isSample ? "sim" : "info");
+  $("#rowCount").textContent = `${S.raw.length} 件`;
+  renderMap(); renderRail(); renderStage();
+}
+function renderMap(){
+  const opt = v => `<option value="">（不使用）</option>` + S.cols.map(c => `<option${c === v ? " selected" : ""}>${esc(c)}</option>`).join("");
+  $("#mapGrid").innerHTML = MAP_FIELDS.map(([k, l]) => `<label for="map-${k}">${l}</label><select id="map-${k}" data-k="${k}">${opt(S.map[k])}</select>`).join("");
+  if (!S.map.id || !S.map.content) $("#mapFold").open = true;
+}
+function loadSample(){ const d = JSON.parse($("#sample").textContent); setData(d.cases, "範例資料（模擬）", true); }
+async function loadFile(file){
+  try {
+    if (/\.(xlsx|xls)$/i.test(file.name)){
+      if (!window.XLSX) throw new Error("試算表元件沒有載入，請改用 CSV");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+      setData(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: true }), file.name, false);
+    } else {
+      const text = await file.text();
+      setData(parseCSV(text), file.name, false);
+    }
+    toast(`已載入 ${S.raw.length} 件，請確認欄位對應後執行`);
+  } catch (e){ toast("無法讀取檔案：" + e.message); }
+}
+function parseCSV(text){
+  text = text.replace(/^﻿/, "");
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){ if (c === '"'){ if (text[i + 1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true; else if (c === ","){ row.push(f); f = ""; } else if (c === "\n" || c === "\r"){ if (c === "\r" && text[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; } else f += c;
+  }
+  if (f || row.length){ row.push(f); rows.push(row); }
+  const h = rows.shift() || [];
+  return rows.map(r => Object.fromEntries(h.map((k, i) => [k.trim(), r[i] ?? ""])));
+}
+
+/* ========= 匯出 ========= */
+function exportRows(){
+  const R = S.res;
+  const log = STAGES.map(s => { const c = counts(s.id); return { 階段: s.code, 名稱: s.name, 技能: s.skill, 輸入件數: c ? c[0] : "", 通過或完成: c ? c[1] : "", 狀態: S.states[s.id] || "" }; });
+  log.unshift({ 階段: "批次", 名稱: S.dataLabel, 技能: "petition-pipeline-agent", 輸入件數: S.raw.length, 通過或完成: "", 狀態: `執行時間 ${ymdhm(S.ranAt || new Date())}；規則 ${RULE_VER}` });
+  return {
+    "執行紀錄": log,
+    "A1_去識別化": R.a1.rows.map(r => ({ 案號: r.id, 主旨: r.subject, 遮罩後內容: r.content, 遮罩後地點: r.location || "", 來源: r.source || "", 處理狀態: r.status, 原因: r.why, 風險提示: r.hint, 資料性質: S.isSample ? "模擬資料" : "" })),
+    "A2_案件理解": R.a2.rows.flatMap(r => (r.demands.length ? r.demands : [null]).map((d, i) => ({ 案號: r.id, 處理狀態: r.status, 摘要: r.summary || "", 序號: d ? i + 1 : "", 訴求內容: d ? d.text : "", 類別: d ? d.cat.name + "（暫定）" : "", 地點原文: r.loc || "", 定位結果: r.locResult || "", 危安: r.flags.danger ? r.flags.danger.v : "", 危安理由: r.flags.danger ? r.flags.danger.why : "", 急迫: r.flags.urgent ? r.flags.urgent.v : "", 陳抗: r.flags.protest ? r.flags.protest.v : "", 重複陳情: r.flags.repeat ? r.flags.repeat.v : "", 多項訴求: r.multi ? "是" : "否" }))),
+    "A3_分案建議": R.a3.rows.flatMap(r => (r.per.length ? r.per : [null]).map(p => ({ 案號: r.id, 案件判斷: r.mode, 訴求: p ? p.demand : "", 第1順位: p ? `${p.cands[0].name}（${p.cands[0].code}）` : "", 依據: p ? p.cands[0].ev : "", 第2順位: p && p.cands[1] ? `${p.cands[1].name}（${p.cands[1].code}）` : "", 第2順位條件: p && p.cands[1] ? p.cands[1].cond : "", 分數型別: "none", 需人工確認: r.review.length ? "是" : "否", 原因: r.review.join("；"), 規則版本: RULE_VER }))),
+    "A4_回覆擬稿": R.a4.rows.map(r => ({ 案號: r.id, 狀態: "草稿－未經人工核定，不得對外發送", 類型: r.mode === "跨單位" ? "A5 跨單位彙整" : "A4", 正式版: r.formal, 精簡版: r.short, 英文版: r.english, 待填寫占位: r.phs, 自檢個資: r.pii.join("、") || "無", 核稿注意: r.notes.join("；") })),
+    "A6_SLA": R.a6.rows.map(r => ({ 案號: r.id, 承辦單位: r.unit, 收文時間: r.rec ? ymdhm(r.rec) : "", 期限: r.due ? ymd(r.due) + " 17:30" : "", 結案時間: r.closed ? ymdhm(r.closed) : "", SLA狀態: r.st, 逾期工作天: r.od || 0, 轉派路徑: r.transfers.join(" → "), 轉派理由: r.reasons.join("；"), 展延: r.ext || "", 承辦人: r.role.H, 窗口: r.role.C, 主管: r.role.S, 資料性質: S.cfg.simSla ? "模擬" : "" })),
+    "A7_調整建議": R.a7.sug.map(x => ({ 建議編號: x.id, 狀態: "草案，待核可", 類型: x.type, 問題與證據: x.ev, 建議內容: x.prop, 風險: x.risk, 驗證方式: x.val, 核可角色: x.who })),
+  };
+}
+async function doExport(){
+  if (!S.res || !S.res.a7){ toast("請先執行全流程"); return; }
+  const sheets = exportRows();
+  const name = `民意信箱分案_${ymd(new Date(S.cfg.asOf))}.xlsx`;
+  let downloads = null;
+  try { downloads = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e){}
+  if (window.XLSX && downloads){
+    const wb = XLSX.utils.book_new();
+    for (const [n, rows] of Object.entries(sheets)) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{ 說明: "無資料" }]), n.slice(0, 31));
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    try { await downloads.save({ filename: name, data: new Uint8Array(buf) }); toast("已交給瀏覽器儲存"); }
+    catch (e){ toast(e && e.code === "declined" ? "已取消儲存" : "這個檢視無法儲存檔案，請改用「複製目前階段表格」"); }
+    return;
+  }
+  copyStageTSV();
+}
+function copyStageTSV(){
+  const sheets = exportRows();
+  const key = { a1: "A1_去識別化", a2: "A2_案件理解", a3: "A3_分案建議", a4: "A4_回覆擬稿", a6: "A6_SLA", a7: "A7_調整建議" }[S.sel];
+  const rows = sheets[key] || [];
+  if (!rows.length){ toast("目前階段沒有資料"); return; }
+  const h = Object.keys(rows[0]);
+  const tsv = [h.join("\t"), ...rows.map(r => h.map(k => String(r[k] ?? "").replace(/[\t\n\r]+/g, " ")).join("\t"))].join("\n");
+  const ok = () => toast(`已複製「${key}」${rows.length} 列，可貼到試算表`);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).then(ok, () => toast("無法存取剪貼簿"));
+  else toast("無法存取剪貼簿");
+}
+
+/* ========= 設定與事件 ========= */
+function syncCfgUI(){
+  const c = S.cfg;
+  $("#wlTime").checked = c.wlTime; $("#wlSource").checked = c.wlSource; $("#wlLoc").checked = c.wlLoc; $("#simSla").checked = c.simSla;
+  $("#holidays").value = c.holidays; $("#asOf").value = c.asOf;
+  [...$("#calMode").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.v === c.calMode));
+  $("#calNote").textContent = c.calMode === "agency" ? "貼上機關核定的非工作日（國定假日、彈性放假、停班日）。補班日請另以備註告知管考。" : c.calMode === "sim" ? "模擬：週一至週五為工作天，再扣除上方日期。結果僅供測試。" : "未提供日曆時，A6 依規定全部標「無法判定」。";
+  $("#holidays").disabled = c.calMode === "none";
+}
+function cfgChanged(){ store.set("cfg", S.cfg); syncCfgUI(); if (S.res){ S.states = {}; S.res = null; renderRail(); renderStage(); toast("參數已變更，請重新執行"); } }
+document.addEventListener("click", e => {
+  const st = e.target.closest(".station"); if (st){ S.sel = st.dataset.id; store.set("sel", S.sel); renderRail(); renderStage(); return; }
+  const tr = e.target.closest("tr[data-case]"); if (tr){ openCase(tr.dataset.case); return; }
+  const fb = e.target.closest(".filters button"); if (fb){ S.filter[S.sel] = fb.dataset.f; renderStage(); return; }
+  const cm = e.target.closest("#calMode button"); if (cm){ S.cfg.calMode = cm.dataset.v; cfgChanged(); return; }
+  const dt = e.target.closest("[data-dt]"); if (dt){ const box = $("#dtxt"); box.innerHTML = hl(box.dataset[dt.dataset.dt]); box.dataset.cur = dt.dataset.dt; dt.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", b === dt)); return; }
+  const act = e.target.closest("[data-act]");
+  if (act && act.dataset.act === "run") runAll();
+  if (act && act.dataset.act === "copy"){ const box = $("#dtxt"); const txt = box.dataset[box.dataset.cur || "f"]; navigator.clipboard && navigator.clipboard.writeText(txt).then(() => toast("已複製草稿（含來源標註）"), () => toast("無法存取剪貼簿，請手動選取文字")); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeCase(); if (e.key === "Enter" && e.target.matches("tr[data-case]")) openCase(e.target.dataset.case); });
+document.addEventListener("input", e => {
+  if (e.target.id && e.target.id.startsWith("q-")){ S.q[S.sel] = e.target.value; const pos = e.target.selectionStart; renderStage(); const el = $("#q-" + S.sel); if (el){ el.focus(); el.setSelectionRange(pos, pos); } }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.matches("#mapGrid select")){ S.map[t.dataset.k] = t.value; S.res = null; S.states = {}; renderRail(); renderStage(); }
+  if (["wlTime","wlSource","wlLoc","simSla"].includes(t.id)){ S.cfg[t.id] = t.checked; cfgChanged(); }
+  if (t.id === "holidays" || t.id === "asOf"){ S.cfg[t.id] = t.value; cfgChanged(); }
+  if (t.id === "fileIn" && t.files[0]) loadFile(t.files[0]);
+});
+$("#btnRun").addEventListener("click", runAll);
+$("#btnExport").addEventListener("click", doExport);
+$("#btnSample").addEventListener("click", () => { loadSample(); toast("已載入範例資料"); });
+$("#btnRules").addEventListener("click", () => {
+  S.sel = S.sel; const el = $("#stage");
+  el.innerHTML = `<div class="stage-head"><div style="flex:1;min-width:0"><div class="eyebrow">分案規則 · ${RULE_VER}</div><h2>內建規則表</h2><p>從新竹市政府公文分案規則參考擷取的常見陳情類別。條件式候選只在條件成立時改派。</p></div></div><div class="tablebox"><table><thead><tr><th>類別</th><th>關鍵字</th><th>第 1 順位</th><th>依據</th><th>條件式候選</th><th>人工確認</th></tr></thead><tbody>${CATS.map(c => `<tr><td><b>${c.name}</b></td><td><span class="clip">${esc(c.kw.join("、"))}</span></td><td>${esc(U[c.c[0].u])} <span class="mono src">${c.c[0].u}</span></td><td><span class="clip">${esc(c.c[0].ev)}</span></td><td>${c.c.slice(1).map(x => `${esc(U[x.u])}<br><span class="src">${esc(x.cond)}</span>`).join("") || ""}</td><td>${esc(c.review || "")}</td></tr>`).join("")}</tbody></table></div><div class="toolbar"><button class="btn" type="button" id="backStage">返回目前階段</button></div>`;
+  $("#backStage").addEventListener("click", renderStage);
+});
+$("#scrim").addEventListener("click", closeCase); $("#drClose").addEventListener("click", closeCase);
+const drop = $("#drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); $("#fileIn").click(); } });
+drop.tabIndex = 0;
+
+syncCfgUI(); loadSample(); runAll();
+</script>
+
+</body></html>
