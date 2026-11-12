@@ -945,11 +945,84 @@ function csvFromResult(res){
   }
   return "";
 }
+/* 執行環境：在 Claude 裡有 window.claude（用連接器）；放在一般網站（如 GitHub Pages）則讀公開分享的試算表 */
+const IN_CLAUDE = !!(window.claude && typeof window.claude.use === "function");
+function gidOf(s){ const m = String(s || "").match(/[#&?]gid=(\d+)/); return m ? m[1] : "0"; }
+/* gviz JSONP：以 <script> 載入，不受 CORS 限制；回傳 DataTable，轉成列 */
+function gvizJSONP(id, gid){
+  return new Promise((resolve, reject) => {
+    const cb = "__gviz" + Date.now() + Math.floor(Math.random() * 1e4);
+    const sc = document.createElement("script");
+    const done = (fn, v) => { clearTimeout(t); try { delete window[cb]; } catch (e){ window[cb] = undefined; } sc.remove(); fn(v); };
+    const t = setTimeout(() => done(reject, { code: "timeout" }), 15000);
+    window[cb] = resp => {
+      if (!resp || resp.status === "error"){ const r = (resp && resp.errors && resp.errors[0]) || {}; done(reject, { code: /access|permission|denied/i.test((r.reason || "") + (r.message || "")) ? "not_public" : "gviz_error", detail: r.detailed_message || r.message || r.reason }); return; }
+      const tb = resp.table || {}; const cols = (tb.cols || []).map((c, i) => (c.label || "").trim() || ("欄" + (i + 1)));
+      const rows = (tb.rows || []).map(r => Object.fromEntries(cols.map((h, i) => { const c = (r.c || [])[i]; return [h, c == null ? "" : (c.f != null ? c.f : (c.v == null ? "" : c.v))]; })));
+      done(resolve, rows);
+    };
+    sc.onerror = () => done(reject, { code: "script_error" });
+    sc.src = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:json;responseHandler:${cb}&headers=1&gid=${gid}&_=${Date.now()}`;
+    document.head.appendChild(sc);
+  });
+}
+async function fetchPublicCSV(raw){
+  const s = String(raw || "").trim();
+  const urls = [];
+  if (/\/pub\?/.test(s) || /output=csv/.test(s)) urls.push(s.replace(/output=[a-z]+/, "output=csv").replace(/\/pubhtml/, "/pub"));
+  const id = sheetId(s);
+  if (id){ const gid = gidOf(s); urls.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`, `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${gid}`); }
+  if (!urls.length) throw { code: "bad_url" };
+  const tried = [];
+  // 1) gviz JSONP（最不受網域限制）
+  if (id){
+    try { const rows = await gvizJSONP(id, gidOf(s)); if (rows.length) return { rows, via: "gviz" }; tried.push("gviz:空白"); }
+    catch (e){ if (e.code === "not_public") throw Object.assign(e, { tried }); tried.push("gviz:" + e.code); }
+  }
+  // 2) CSV 匯出（需要 Google 回應允許跨網域）
+  let last = null;
+  for (const u of urls){
+    const tag = /gviz/.test(u) ? "csv-gviz" : /\/pub/.test(u) ? "pub" : "export";
+    try {
+      const res = await fetch(u, { credentials: "omit", redirect: "follow" });
+      const text = await res.text();
+      if (!res.ok){ last = { code: res.status === 404 ? "not_found" : "http", status: res.status }; tried.push(tag + ":HTTP " + res.status); continue; }
+      if (/^\s*<(!doctype|html)/i.test(text)){ last = { code: "not_public" }; tried.push(tag + ":登入頁"); continue; }
+      if (looksCSV(text)) return { rows: parseCSV(text), via: tag };
+      last = { code: "not_csv" }; tried.push(tag + ":非表格");
+    } catch (e){ last = { code: "network" }; tried.push(tag + ":被瀏覽器擋下"); }
+  }
+  throw Object.assign(last || { code: "network" }, { tried });
+}
+async function loadSheetPublic(){
+  const raw = $("#gsUrl").value;
+  try {
+    const got = await fetchPublicCSV(raw);
+    const rows = got.rows;
+    if (!rows.length){ gsStatus("試算表第一個工作表沒有資料列。", "bad"); return; }
+    const id = sheetId(raw) || "pub";
+    setData(rows, `Google 試算表（${id.slice(0, 6)}…）`, false);
+    S.sheet = { id, at: new Date() };
+    gsStatus(`已載入 ${S.raw.length} 件，${ymdhm(S.sheet.at)} 讀取。確認欄位對應後按「執行全流程」。`, "ok");
+    toast(`已從 Google 試算表載入 ${S.raw.length} 件`);
+  } catch (e){
+    const msg = {
+      bad_url: "找不到試算表 ID。請貼上 docs.google.com/spreadsheets/d/… 的完整連結。",
+      not_public: "這份試算表沒有公開分享，網站無法讀取。請在試算表按「共用 → 一般存取權 → 知道連結的使用者（檢視者）」，再按一次載入。",
+      not_found: "找不到這份試算表或工作表（gid）。請確認連結正確。",
+      not_csv: "讀到的內容不是表格資料。請確認連結指向試算表。",
+      network: "瀏覽器無法連到 Google 試算表。可能是機關網路、防火牆或瀏覽器擴充功能封鎖了 docs.google.com，也可能是組織政策限制外部讀取。請換個網路再試，或改用下載 CSV 後上傳。",
+      gviz_error: "Google 試算表回報錯誤" + (e && e.detail ? "：" + e.detail : "") + "。請確認連結與工作表正確。",
+    }[e && e.code] || `讀取失敗（HTTP ${e && e.status}）。請稍後再試，或改用下載 CSV 後上傳。`;
+    gsStatus(msg + (e && e.tried && e.tried.length ? `（診斷：${e.tried.join("、")}）` : ""), "bad");
+  }
+}
 async function loadSheet(){
-  const id = sheetId($("#gsUrl").value);
-  if (!id){ gsStatus("找不到檔案 ID。請貼上 docs.google.com/spreadsheets/d/… 的完整連結。", "bad"); return; }
   store.set("gsUrl", $("#gsUrl").value.trim());
-  const btn = $("#btnSheet"); btn.disabled = true; gsStatus("正在從 Google 雲端硬碟讀取…", "busy");
+  const btn = $("#btnSheet"); btn.disabled = true; gsStatus("正在讀取 Google 試算表…", "busy");
+  if (!IN_CLAUDE){ try { await loadSheetPublic(); } finally { btn.disabled = false; } return; }
+  const id = sheetId($("#gsUrl").value);
+  if (!id){ gsStatus("找不到檔案 ID。請貼上 docs.google.com/spreadsheets/d/… 的完整連結。", "bad"); btn.disabled = false; return; }
   try {
     const mcp = window.claude && window.claude.use ? await window.claude.use("mcp") : null;
     if (!mcp){ gsStatus("這個檢視無法使用連接器。請在 claude.ai 開啟此頁，或在試算表選「檔案 → 下載 → CSV」後上傳。", "bad"); return; }
@@ -1005,13 +1078,19 @@ async function doExport(){
   const name = `民意信箱分案_${ymd(new Date(S.cfg.asOf))}.xlsx`;
   let downloads = null;
   try { downloads = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e){}
-  if (window.XLSX && downloads){
-    const wb = XLSX.utils.book_new();
-    for (const [n, rows] of Object.entries(sheets)) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{ 說明: "無資料" }]), n.slice(0, 31));
-    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  if (!window.XLSX){ copyStageTSV(); return; }
+  const wb = XLSX.utils.book_new();
+  for (const [n, rows] of Object.entries(sheets)) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{ 說明: "無資料" }]), n.slice(0, 31));
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  if (downloads){
     try { await downloads.save({ filename: name, data: new Uint8Array(buf) }); toast("已交給瀏覽器儲存"); }
-    catch (e){ toast(e && e.code === "declined" ? "已取消儲存" : "這個檢視無法儲存檔案，請改用「複製目前階段表格」"); }
+    catch (e){ toast(e && e.code === "declined" ? "已取消儲存" : "這個檢視無法儲存檔案，已改為複製目前階段表格"); if (!(e && e.code === "declined")) copyStageTSV(); }
     return;
+  }
+  if (!IN_CLAUDE){
+    const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000); toast("已下載 " + name); return;
   }
   copyStageTSV();
 }
@@ -1060,10 +1139,14 @@ document.addEventListener("change", e => {
 });
 $("#btnRun").addEventListener("click", runAll);
 $("#btnExport").addEventListener("click", doExport);
-$("#btnSample").addEventListener("click", () => { loadSample(); gsStatus("讀取第一個工作表。使用你自己的 Google 雲端硬碟授權，第一次會請你同意。"); toast("已載入範例資料"); });
+const GS_HINT = IN_CLAUDE ? "讀取第一個工作表。使用你自己的 Google 雲端硬碟授權，第一次會請你同意。" : "讀取連結指定的工作表。試算表須設為「知道連結的使用者可檢視」。只適合已去識別化或模擬的資料。";
+gsStatus(GS_HINT);
+$("#btnSample").addEventListener("click", () => { loadSample(); gsStatus(GS_HINT); toast("已載入範例資料"); });
 $("#btnSheet").addEventListener("click", loadSheet);
 $("#gsUrl").addEventListener("keydown", e => { if (e.key === "Enter") loadSheet(); });
-$("#gsUrl").value = store.get("gsUrl", "https://docs.google.com/spreadsheets/d/1eaiYRSoTbA309PBbnxXxNw3hD89YQQJQS4Dte-5ZzPM/edit");
+const GS_DEFAULT = "https://docs.google.com/spreadsheets/d/1eaiYRSoTbA309PBbnxXxNw3hD89YQQJQS4Dte-5ZzPM/edit?usp=sharing";
+$("#gsUrl").value = store.get("gsUrl2", GS_DEFAULT);
+$("#gsUrl").addEventListener("change", () => store.set("gsUrl2", $("#gsUrl").value.trim()));
 $("#btnRules").addEventListener("click", () => {
   S.sel = S.sel; const el = $("#stage");
   el.innerHTML = `<div class="stage-head"><div style="flex:1;min-width:0"><div class="eyebrow">分案規則 · ${RULE_VER}</div><h2>內建規則表</h2><p>從新竹市政府公文分案規則參考擷取的常見陳情類別。條件式候選只在條件成立時改派。</p></div></div><div class="tablebox"><table><thead><tr><th>類別</th><th>關鍵字</th><th>第 1 順位</th><th>依據</th><th>條件式候選</th><th>人工確認</th></tr></thead><tbody>${CATS.map(c => `<tr><td><b>${c.name}</b></td><td><span class="clip">${esc(c.kw.join("、"))}</span></td><td>${esc(U[c.c[0].u])} <span class="mono src">${c.c[0].u}</span></td><td><span class="clip">${esc(c.c[0].ev)}</span></td><td>${c.c.slice(1).map(x => `${esc(U[x.u])}<br><span class="src">${esc(x.cond)}</span>`).join("") || ""}</td><td>${esc(c.review || "")}</td></tr>`).join("")}</tbody></table></div><div class="toolbar"><button class="btn" type="button" id="backStage">返回目前階段</button></div>`;
